@@ -69,13 +69,20 @@ class Project:
         self.assets[f"{md5}.{ext}"] = data
         return md5
 
-    def costume(self, name, im, res=2, center=None):
+    def costume(self, name, im, res=2, center=None, quantize=0):
         b = io.BytesIO()
+        if quantize:
+            im = im.quantize(colors=quantize, method=Image.FASTOCTREE)
         im.save(b, "PNG", optimize=True)
         md5 = self.add_asset(b.getvalue(), "png")
         cx, cy = center if center else (im.width / 2, im.height / 2)
         return {"name": name, "bitmapResolution": res, "dataFormat": "png", "assetId": md5,
                 "md5ext": f"{md5}.png", "rotationCenterX": cx, "rotationCenterY": cy}
+
+    def costume_bytes(self, name, data, res, center):
+        md5 = self.add_asset(data, "png")
+        return {"name": name, "bitmapResolution": res, "dataFormat": "png", "assetId": md5,
+                "md5ext": f"{md5}.png", "rotationCenterX": center[0], "rotationCenterY": center[1]}
 
     def sound(self, name, path):
         with tempfile.TemporaryDirectory() as td:
@@ -132,6 +139,14 @@ class Target:
         self.visible = True
         self.tops = 0
         self.direction = 90
+        self.local_vars = {}
+
+    def lvar(self, name, initial=0):
+        """Variable 'solo para este sprite' (cada clon tiene su copia)."""
+        self.local_vars[name] = initial
+        v = Var(name)
+        v.id = f"lvar_{self.name}_{name}"
+        return v
 
     # ---- bajo nivel
     def blk(self, op, inputs=None, fields=None, mutation=None, shadow=False):
@@ -247,6 +262,9 @@ class Target:
 
     def chg(self, v, x):
         return self.blk("data_changevariableby", {"VALUE": val(x)}, {"VARIABLE": [v.name, v.id]})
+
+    def itemnum(self, l, x):
+        return Rep(self.blk("data_itemnumoflist", {"ITEM": val(x, "s")}, {"LIST": [l.name, l.id]}))
 
     def item(self, l, i):
         return Rep(self.blk("data_itemoflist", {"INDEX": val(i)}, {"LIST": [l.name, l.id]}))
@@ -434,6 +452,8 @@ class Target:
                       "tempo": 60, "videoTransparency": 50, "videoState": "on",
                       "textToSpeechLanguage": None})
         else:
+            d["variables"] = {v_id: [n, v] for n, v in self.local_vars.items()
+                              for v_id in [f"lvar_{self.name}_{n}"]}
             d.update({"visible": self.visible, "x": self.pos[0], "y": self.pos[1], "size": self.size,
                       "direction": self.direction, "draggable": False, "rotationStyle": "all around"})
         return d

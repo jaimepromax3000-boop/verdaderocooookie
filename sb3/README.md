@@ -28,10 +28,14 @@ de los **datos reales del juego** extraídos ejecutando `index.html` (`sb3/game_
 - **Titular de noticias** arriba (franja de `darkNoiseTopBar.jpg`): ~1.300 titulares reales muestreados de `Game.getNewTicker()`
   (generales por galletas horneadas y específicos de cada edificio comprado), con desvanecido, cambio cada 10 s y al hacer
   clic (50 clics = logro *Tabloid addiction*).
-- Textos grandes y nítidos: dos juegos de glifos (pequeño y grande), columnas repartidas para dar espacio, barras de
-  desplazamiento en tienda/mejoras/filas y cuadros de ayuda anchos que quedan por encima de la galleta.
-- Botón *Stats* con las estadísticas principales; contadores con el formato del juego (`1,234`, `1.235 million`…) y la fuente
-  **Merriweather** original (los glifos se renderizan desde `fonts/` con `sb3/render_glyphs.js`).
+- **Texto prefabricado y nítido**: cada cadena (nombres, descripciones, logros, titulares, etiquetas) está renderizada de
+  antemano con la fuente real del juego (Merriweather Black) y es un *disfraz* de un sprite; unos clones lo colocan en
+  pantalla, así que se dibuja a la resolución de la ventana y no se pixela como el texto hecho con el lápiz.
+  Los números (contador, precios, cantidades…) usan disfraces de dígitos y de palabras («million», «billion»…).
+  Sprites de texto: `Label` (columnas), `LabelTop` (cuadros de ayuda y avisos), `TipPanel` (fondo del cuadro) y
+  `Ticker` (un disfraz por titular).
+- Columnas repartidas para dar espacio, barras de desplazamiento en tienda/mejoras/filas y cuadros de ayuda anchos.
+- Botón *Stats* con las estadísticas principales; contadores con el formato del juego (`1,234`, `1.235 million`…).
 
 ## Cómo se verificó
 Con el motor real del juego (`index.html` en un navegador) como oráculo: en 500 estados aleatorios (edificios, mejoras,
@@ -47,4 +51,5 @@ mejoras de pociones/mods, guardado de partida, idiomas y logros que dependen de 
 
 ## Archivos
 - `build_sb3.py`, `sb3dsl.py`, `gamedata.py`: generador (DSL de bloques, clasificación de mejoras y logros).
-- `extract_game_data.js`, `render_glyphs.js`, `extract_news.js`: extraen `game_data.json`, `glyphs.json` y `news.json` con Playwright.
+- `textgen.py`: renderiza el texto prefabricado con Pillow (`assets/merriweather-black.ttf`, convertida de `fonts/d.woff2`).
+- `extract_game_data.js`, `extract_news.js`: extraen `game_data.json` y `news.json` con Playwright (`render_glyphs.js` ya no se usa).
