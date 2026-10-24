@@ -20,11 +20,16 @@ de los **datos reales del juego** extraídos ejecutando `index.html` (`sb3/game_
   (15 niveles cada uno), cursor ×2, «Thousand fingers…Undecillion fingers», ratones, abuelas con oficio y centro de bingo,
   gatitos (leche), galletas (+% de producción, 143), y «Lucky day / Serendipity / Get lucky». Se muestran en la
   cuadrícula superior con los marcos de `upgradeFrame.png`, ordenadas por precio, con ayuda emergente al pasar el ratón.
-- **515 logros reales** (banco, CpS, «Have N», producción por edificio, clics, galletas doradas, mejoras, edificios…)
+- **516 logros reales** (banco, CpS, «Have N», producción por edificio, clics, galletas doradas, mejoras, edificios…)
   con aviso al desbloquear, visor de logros (botón *Achievements*) y **leche** (progreso = logros / 25) que sube en la
   parte inferior con los mismos tipos de leche del juego.
 - **Galleta dorada**: Frenzy (×7), Lucky, Click frenzy (×777 al clic) y Building special, con la selección y duraciones del
   original. Aparece cada 5-15 min (la mitad con *Lucky day*, etc.) y dura 13 s.
+- **Titular de noticias** arriba (franja de `darkNoiseTopBar.jpg`): ~1.300 titulares reales muestreados de `Game.getNewTicker()`
+  (generales por galletas horneadas y específicos de cada edificio comprado), con desvanecido, cambio cada 10 s y al hacer
+  clic (50 clics = logro *Tabloid addiction*).
+- Textos grandes y nítidos: dos juegos de glifos (pequeño y grande), columnas repartidas para dar espacio, barras de
+  desplazamiento en tienda/mejoras/filas y cuadros de ayuda anchos que quedan por encima de la galleta.
 - Botón *Stats* con las estadísticas principales; contadores con el formato del juego (`1,234`, `1.235 million`…) y la fuente
   **Merriweather** original (los glifos se renderizan desde `fonts/` con `sb3/render_glyphs.js`).
 
@@ -36,10 +41,10 @@ desbloqueos por cantidad de edificios coinciden en 40 estados aleatorios.
 
 ## Qué NO está (Scratch no puede con todo el juego)
 Ascensión y ficha celestial, mejoras celestiales/investigación, temporadas (Navidad, Pascua…), huevos, abuelas furiosas/
-wrinklers, dragón, bolsa de valores y demás minijuegos, niveles de edificio con terrones de azúcar, titular de noticias,
+wrinklers, dragón, bolsa de valores y demás minijuegos, niveles de edificio con terrones de azúcar,
 mejoras de pociones/mods, guardado de partida, idiomas y logros que dependen de esas funciones (la leche usa solo los
-515 logros incluidos, de 622).
+516 logros incluidos, de 622).
 
 ## Archivos
 - `build_sb3.py`, `sb3dsl.py`, `gamedata.py`: generador (DSL de bloques, clasificación de mejoras y logros).
-- `extract_game_data.js`, `render_glyphs.js`: extraen `game_data.json` y `glyphs.json` con Playwright.
+- `extract_game_data.js`, `render_glyphs.js`, `extract_news.js`: extraen `game_data.json`, `glyphs.json` y `news.json` con Playwright.

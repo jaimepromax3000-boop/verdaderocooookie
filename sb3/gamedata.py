@@ -199,7 +199,7 @@ def build_achievements():
         m = re.match(r"^Own (\d+) kitten upgrades\.$", d)
         if m:
             add(n, A_KITTEN, 0, int(m.group(1))); continue
-        if n in ("Just wrong", "Early bird", "Fading luck"):
+        if n in ("Just wrong", "Early bird", "Fading luck", "Tabloid addiction"):
             add(n, A_EVENT, 0, 0); continue
     # 'You win a cookie' (100 billones) es de tipo banco
     if "You win a cookie" in A and all(r["name"] != "You win a cookie" for r in rows):

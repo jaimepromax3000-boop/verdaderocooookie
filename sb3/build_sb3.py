@@ -43,14 +43,21 @@ def fl(x):
 # ======================================================================================
 # Disposicion (coordenadas de escenario, origen en el centro, y hacia arriba)
 # ======================================================================================
-LEFT_CX, CK_Y = -167.5, -8
-CEN_L, CEN_W, ROW_H, ROW_TOP, CROWS = -95, 165, 48, 158, 7
-R_X0 = 70
-UP_COLS, UP_ROWS, UP_SP, UP_X0, UP_Y0 = 5, 3, 33, 88.5, 148
-BTN_Y = 56
-SH_X, SH_W, SH_ROW_H, SH_Y0, SH_SP, SH_ROWS = 155, 168, 36, 29, 37, 6
-TIP_W, TIP_H, TIP_RX = 190, 96, 66            # cuadro de ayuda: ancho, alto y borde derecho
-MILK_W = 145
+LEFT_CX, CK_Y = -172.5, -20
+CEN_L, CEN_W, ROW_H, ROW_TOP, CROWS = -105, 150, 48, 128, 6
+HDR_Y = 139                                      # botones Stats / Achievements
+R_X0 = 45
+UP_COLS, UP_ROWS, UP_SP, UP_Y0 = 6, 3, 32, 148
+UP_X0 = R_X0 + 3 + UP_SP / 2
+UP_SZ = round(UP_SP / 60 * 100)                  # tamano (%) de marco e icono de cada mejora
+BTN_Y = 58
+SH_W, SH_ROW_H, SH_Y0, SH_SP, SH_ROWS = 172, 36, 31, 37, 6
+SH_X = R_X0 + 2 + SH_W / 2
+SB_X = R_X0 + SH_W + 16                          # barra de desplazamiento de la tienda
+TIP_W, TIP_H, TIP_RX = 250, 104, 40              # cuadro de ayuda: ancho, alto y borde derecho
+MILK_W = CEN_L + 240                             # ancho de la columna izquierda
+OV_W, OV_CX = (R_X0 + 240), (-240 + R_X0) / 2    # paneles a pantalla de Logros / Stats
+TICK_CX, TICK_W = (-240 + R_X0) / 2, R_X0 + 240  # titular de noticias (arriba, izquierda + centro)
 
 # ======================================================================================
 # Recursos graficos
@@ -111,7 +118,7 @@ def button_image(w, h, on):
     return im
 
 
-BTN_W = {"buy": 28, "sell": 28, "b1": 22, "b10": 22, "b100": 26, "bmax": 26, "wide": 80, "stats": 40}
+BTN_W = {"buy": 30, "sell": 30, "b1": 24, "b10": 24, "b100": 28, "bmax": 28, "wide": 80, "stats": 40}
 C_BTN = {}
 for key, w in BTN_W.items():
     C_BTN[key] = add_costume(key + "Off", button_image(w, 14, False))
@@ -126,8 +133,23 @@ def panel_image(w, h, alpha=225, border=(214, 182, 132, 255)):
 
 
 C_TIP = add_costume("tip", panel_image(TIP_W, TIP_H))
-C_OVER = add_costume("overlay", panel_image(310, 360, 255))
-C_TOAST = add_costume("toast", panel_image(140, 30, 232))
+C_OVER = add_costume("overlay", panel_image(OV_W, 360, 255))
+C_TOAST = add_costume("toast", panel_image(MILK_W - 4, 30, 232))
+
+
+def solid(w, h, rgba, radius=0):
+    im = Image.new("RGBA", (int(w * 2), int(h * 2)), (0, 0, 0, 0))
+    ImageDraw.Draw(im).rounded_rectangle((0, 0, int(w * 2) - 1, int(h * 2) - 1), radius, fill=rgba)
+    return im
+
+
+C_BAND = add_costume("counterBand", solid(MILK_W, 52, (0, 0, 0, 105)))
+C_PILL = add_costume("bakeryPill", solid(MILK_W - 24, 22, (0, 0, 0, 120), 14))
+C_TRACK = add_costume("scrollTrack", solid(5, 204, (0, 0, 0, 150), 3))
+C_THUMB = add_costume("scrollThumb", solid(8, 22, (214, 182, 132, 255), 4))
+_sh = load("cookieShadow.png").resize((200, 200), Image.LANCZOS)
+C_SHADOW = add_costume("cookieShadow", _sh)
+C_COOKIE = add_costume("perfectCookie", load("perfectCookie.png").resize((200, 200), Image.LANCZOS))
 
 
 def arrow_image(up):
@@ -275,7 +297,7 @@ L_UUT = P.lst("upgrade unlock type", [r["ut"] for r in UPG])
 L_UUA = P.lst("upgrade unlock a", [fl(r["ua"]) for r in UPG])
 L_UUB = P.lst("upgrade unlock b", [fl(r["ub"]) for r in UPG])
 L_USTATE = P.lst("upgrade state", [0] * NU)
-L_UD = [P.lst(f"upgrade desc {k + 1}", [G.wrap(r["desc"])[k] for r in UPG]) for k in range(3)]
+L_UD = [P.lst(f"upgrade desc {k + 1}", [G.wrap(r["desc"], 44, 3)[k] for r in UPG]) for k in range(3)]
 L_USHOW = P.lst("upgrades in store", [])
 
 L_ANAME = P.lst("achievement name", [r["name"] for r in ACH])
@@ -284,7 +306,7 @@ L_ATYPE = P.lst("achievement type", [r["type"] for r in ACH])
 L_AA = P.lst("achievement a", [fl(r["a"]) for r in ACH])
 L_AB = P.lst("achievement b", [fl(r["b"]) for r in ACH])
 L_AWON = P.lst("achievement won", [0] * NA)
-L_AD = [P.lst(f"achievement desc {k + 1}", [G.wrap(r["desc"], 38, 2)[k] for r in ACH]) for k in range(2)]
+L_AD = [P.lst(f"achievement desc {k + 1}", [G.wrap(r["desc"], 44, 2)[k] for r in ACH]) for k in range(2)]
 
 L_PX = P.lst("particle x", [])
 L_PY = P.lst("particle y", [])
@@ -315,6 +337,12 @@ def make_backdrop():
     im.alpha_composite(shade)
     sb = load("shadedBordersSoft.png").resize((cx0, H), Image.LANCZOS)
     im.alpha_composite(sb, (0, 0))
+    top = Image.open(os.path.join(IMG, "darkNoiseTopBar.jpg")).convert("RGBA")   # franja del titular de noticias
+    for x in range(0, cx1, 512):
+        im.paste(top.crop((0, 0, min(512, cx1 - x), 60)), (x, 0))
+    ph = Image.open(os.path.join(IMG, "panelHorizontal.png")).convert("RGBA")
+    for x in range(0, cx1, 512):
+        im.alpha_composite(ph.crop((0, 0, min(512, cx1 - x), 16)), (x, 52))
     pv = Image.open(os.path.join(IMG, "panelVertical.png")).convert("RGBA")
     for x in (cx0 - 8, cx1 - 8):
         for y in range(0, H, 512):
@@ -710,22 +738,107 @@ T.body(
 )
 
 
-# --- drawCenter: botones Stats / Achievements + filas de edificios -----------------------
+# --- datos del titular de noticias (titulares reales muestreados de Game.getNewTicker) ----
+_news = json.load(open(os.path.join(HERE, "news.json")))
+_norm = lambda t: __import__("re").sub(r"\d+", "#", t)
+_entries, _seen = [], set()
+for _t, _x in _news["general"]:
+    if _norm(_x) not in _seen:
+        _seen.add(_norm(_x))
+        _entries.append((0, _t, _x))
+for _bn, _lst in _news["buildings"].items():
+    _bi = G.BIDX[_bn]
+    for _x in _lst:
+        if (_bn, _norm(_x)) not in _seen:
+            _seen.add((_bn, _norm(_x)))
+            _entries.append((_bi, 0, _x))
+
+
+def _news_layout(x):
+    x = G.ascii_(x)
+    if len(x) <= 108:
+        lines, size, nl = G.wrap(x, 54, 3)[:2] + [""], 62, 2
+        rest = G.wrap(x, 54, 3)
+        if rest[2]:
+            lines, size, nl = G.wrap(x, 70, 3), 47, 3
+    else:
+        lines, size, nl = G.wrap(x, 70, 3), 47, 3
+    return lines, size, nl
+
+
+_lay = [_news_layout(e[2]) for e in _entries]
+L_NCAT = P.lst("news category", [e[0] for e in _entries])
+L_NMIN = P.lst("news min baked", [fl(e[1]) for e in _entries])
+L_NSIZE = P.lst("news size", [l[1] for l in _lay])
+L_NNL = P.lst("news lines", [l[2] for l in _lay])
+L_NL = [P.lst(f"news line {k + 1}", [l[0][k] for l in _lay]) for k in range(3)]
+L_NCATS = P.lst("news categories now", [])
+L_NOK = P.lst("news eligible", [])
+tick_cur, tick_t0, tick_clicks, nm_sz = V("news current"), V("news started"), V("news clicks"), V("name size")
+rows_owned, news_try = V("rows owned"), V("news try")
+
+# --- pickNews: categoria al azar (general + edificios comprados), luego un titular de esa categoria ---
+pick_news = T.defproc("pickNews", [])
+T.body(
+    pick_news,
+    T.delall(L_NCATS), T.addto(L_NCATS, 0),
+    T.setv(r_b, 2),
+    T.repeat(N - 1, T.if_(T.gt(T.item(L_BAMT, r_b), 0), T.addto(L_NCATS, r_b)), T.chg(r_b, 1)),
+    T.setv(news_try, 0),
+    T.setv(t_a, tick_cur),
+    T.until(T.or_(T.gt(news_try, 0), T.eq(tick_cur, -1)),
+            T.setv(t_c, T.item(L_NCATS, T.rnd(1, T.lsize(L_NCATS)))),
+            T.delall(L_NOK),
+            *for_range(r_i, len(_entries),
+                       T.if_(T.eq(T.item(L_NCAT, r_i), t_c),
+                             T.if_(T.or_(T.gt(t_c, 0), T.not_(T.lt(baked, T.item(L_NMIN, r_i)))), T.addto(L_NOK, r_i)))),
+            T.if_(T.gt(T.lsize(L_NOK), 0),
+                  T.setv(tick_cur, T.item(L_NOK, T.rnd(1, T.lsize(L_NOK)))),
+                  T.if_(T.or_(T.ne(tick_cur, t_a), T.lt(T.lsize(L_NOK), 2)), T.setv(news_try, 1)))),
+    T.setv(tick_t0, T.timer()),
+)
+
+# --- drawTicker: titular de noticias arriba (se desvanece; cambia cada 10 s o al hacer clic) ---
+draw_ticker = T.defproc("drawTicker", [])
+age_v, fade_v = V("news age"), V("news fade")
+TK_Y = 165
+T.body(
+    draw_ticker,
+    T.setv(age_v, T.sub(T.timer(), tick_t0)),
+    T.if_(T.or_(T.lt(tick_cur, 1), T.gt(age_v, 10)), pick_news.call(), T.setv(age_v, 0)),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(TICK_CX, TK_Y, TICK_W / 2, 15)),
+          T.setv(clk_ui, 0), pick_news.call(), T.setv(age_v, 0), T.chg(tick_clicks, 1),
+          T.if_(T.eq(tick_clicks, 50), T.bcast("win tabloid"))),
+    T.setv(fade_v, T.max_(0, T.min_(1, T.min_(T.mul(age_v, 2.5), T.mul(T.sub(10, age_v), 2.5))))),
+    T.effect("ghost", T.mul(100, T.sub(1, fade_v))),
+    T.setv(r_n, T.item(L_NNL, tick_cur)),
+    T.ifelse(T.eq(r_n, 2),
+             [draw_text.call(T.item(L_NL[0], tick_cur), TICK_CX, TK_Y + 6, T.item(L_NSIZE, tick_cur), 1, "w"),
+              draw_text.call(T.item(L_NL[1], tick_cur), TICK_CX, TK_Y - 5, T.item(L_NSIZE, tick_cur), 1, "w")],
+             [draw_text.call(T.item(L_NL[0], tick_cur), TICK_CX, TK_Y + 9.5, T.item(L_NSIZE, tick_cur), 1, "w"),
+              draw_text.call(T.item(L_NL[1], tick_cur), TICK_CX, TK_Y, T.item(L_NSIZE, tick_cur), 1, "w"),
+              draw_text.call(T.item(L_NL[2], tick_cur), TICK_CX, TK_Y - 9.5, T.item(L_NSIZE, tick_cur), 1, "w")]),
+    T.effect("ghost", 0),
+)
+
+# --- drawCenter: botones Stats / Achievements, flechas y filas de edificios ---------------
 btn_on = V("button on")
 draw_center = T.defproc("drawCenter", [])
-ST_X, AC_X = CEN_L + 4 + BTN_W["stats"] / 2, CEN_L + 4 + BTN_W["stats"] + 4 + BTN_W["wide"] / 2
+ST_X = CEN_L + 4 + BTN_W["stats"] / 2
+AC_X = CEN_L + 4 + BTN_W["stats"] + 4 + BTN_W["wide"] / 2
+CA_UP, CA_DN = CEN_L + CEN_W - 22, CEN_L + CEN_W - 8
 T.body(
     draw_center,
     T.setv(btn_on, 0),
     T.if_(T.eq(ov_open, 2), T.setv(btn_on, 1)),
-    T.if_(inside(ST_X, 170, BTN_W["stats"] / 2, 8), T.setv(btn_on, 1),
+    T.if_(inside(ST_X, HDR_Y, BTN_W["stats"] / 2, 8), T.setv(btn_on, 1),
           T.if_(T.eq(clk_ui, 1), T.setv(ov_open, 2), T.setv(clk_ui, 0))),
-    btn.call(C_BTN["stats"], ST_X, 170, "Stats", btn_on),
+    btn.call(C_BTN["stats"], ST_X, HDR_Y, "Stats", btn_on),
     T.setv(btn_on, 0),
     T.if_(T.eq(ov_open, 1), T.setv(btn_on, 1)),
-    T.if_(inside(AC_X, 170, BTN_W["wide"] / 2, 8), T.setv(btn_on, 1),
+    T.if_(inside(AC_X, HDR_Y, BTN_W["wide"] / 2, 8), T.setv(btn_on, 1),
           T.if_(T.eq(clk_ui, 1), T.setv(ov_open, 1), T.setv(clk_ui, 0))),
-    btn.call(C_BTN["wide"], AC_X, 170, "Achievements", btn_on),
+    btn.call(C_BTN["wide"], AC_X, HDR_Y, "Achievements", btn_on),
     T.setv(r_slot, 0), T.setv(r_k, 0), T.setv(r_b, 2),
     T.repeat(N - 1,
              T.if_(T.gt(T.item(L_BAMT, r_b), 0),
@@ -733,21 +846,29 @@ T.body(
                    T.if_(T.and_(T.gt(r_k, cen_off), T.lt(r_slot, CROWS)),
                          draw_row.call(r_b, r_slot), T.chg(r_slot, 1))),
              T.chg(r_b, 1)),
+    T.setv(rows_owned, r_k),
+    T.if_(T.gt(cen_off, T.max_(0, T.sub(rows_owned, CROWS))), T.setv(cen_off, T.max_(0, T.sub(rows_owned, CROWS)))),
+    *stamp_at(C_ARR_UP, CA_UP, HDR_Y, 36, 0), *stamp_at(C_ARR_DN, CA_DN, HDR_Y, 36, 0),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(CA_UP, HDR_Y, 8, 8)),
+          T.if_(T.gt(cen_off, 0), T.chg(cen_off, -1)), T.setv(clk_ui, 0)),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(CA_DN, HDR_Y, 8, 8)),
+          T.if_(T.lt(cen_off, T.max_(0, T.sub(rows_owned, CROWS))), T.chg(cen_off, 1)), T.setv(clk_ui, 0)),
 )
 
 # --- drawUpgrades: cuadricula de mejoras (marcos de upgradeFrame.png) ---------------------
 draw_up = T.defproc("drawUpgrades", [])
 uk, uu, ucx, ucy = V("up slot"), V("up index"), V("up x"), V("up y")
 afford_u = V("up affordable")
+UA1, UA2 = R_X0 + SH_W - 12, R_X0 + SH_W + 6
+UH_Y = 172
 T.body(
     draw_up,
     T.effect("ghost", 0),
-    draw_text.call("Upgrades", R_X0 + 4, 173, 72, 0, "w"),
-    # flechas de desplazamiento
-    *stamp_at(C_ARR_UP, 212, 174, 40, 0), *stamp_at(C_ARR_DN, 232, 174, 40, 0),
-    T.if_(T.and_(T.eq(clk_ui, 1), inside(212, 174, 9, 9)),
+    draw_text.call("Upgrades", R_X0 + 5, UH_Y, 82, 0, "w"),
+    *stamp_at(C_ARR_UP, UA1, UH_Y, 40, 0), *stamp_at(C_ARR_DN, UA2, UH_Y, 40, 0),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(UA1, UH_Y, 9, 9)),
           T.if_(T.gt(up_off, 0), T.chg(up_off, -1)), T.setv(clk_ui, 0)),
-    T.if_(T.and_(T.eq(clk_ui, 1), inside(232, 174, 9, 9)),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(UA2, UH_Y, 9, 9)),
           T.if_(T.lt(up_off, T.max_(0, T.sub(T.math("ceiling", T.div(up_n, UP_COLS)), UP_ROWS))),
                 T.chg(up_off, 1)), T.setv(clk_ui, 0)),
     *for_range(
@@ -758,24 +879,22 @@ T.body(
               T.setv(ucx, T.add(UP_X0, T.mul(UP_SP, T.mod(T.sub(uk, 1), UP_COLS)))),
               T.setv(ucy, T.sub(UP_Y0, T.mul(UP_SP, T.math("floor", T.div(T.sub(uk, 1), UP_COLS))))),
               T.ifelse(T.lt(cookies, T.item(L_UPRICE, uu)), [T.setv(afford_u, 0)], [T.setv(afford_u, 1)]),
-              *stamp_at(C_CRATE_BG, ucx, ucy, 55, 0),
+              *stamp_at(C_CRATE_BG, ucx, ucy, UP_SZ, 0),
               T.if_(T.eq(afford_u, 0), T.effect("ghost", 55)),
-              *stamp_at(T.item(L_UICON, uu), ucx, ucy, 55),
+              *stamp_at(T.item(L_UICON, uu), ucx, ucy, UP_SZ),
               T.effect("ghost", 0),
-              T.ifelse(T.eq(afford_u, 1),
-                       [T.costume_to(C_FRAME_ON)], [T.costume_to(C_FRAME_OFF)]),
-              T.if_(inside(ucx, ucy, 16.5, 16.5),
+              T.ifelse(T.eq(afford_u, 1), [T.costume_to(C_FRAME_ON)], [T.costume_to(C_FRAME_OFF)]),
+              T.if_(inside(ucx, ucy, UP_SP / 2, UP_SP / 2),
                     T.setv(hk, 1), T.setv(hi, uu), T.setv(hy, ucy),
                     T.if_(T.eq(afford_u, 1), T.costume_to(C_FRAME_HOV)),
                     T.if_(T.eq(clk_ui, 1), T.setv(clk_ui, 0), buy_u.call(uu))),
-              T.size_to(55), T.goto(ucx, ucy), T.pen_stamp())),
+              T.size_to(UP_SZ), T.goto(ucx, ucy), T.pen_stamp())),
 )
 
-# --- drawShop: botones comprar/vender y filas de edificios ------------------------------
+# --- drawShop: botones comprar/vender, filas de edificios y barra de desplazamiento -------
 draw_shop = T.defproc("drawShop", [])
 sk, sb_, sy_, sv_ = V("shop slot"), V("shop building"), V("shop y"), V("shop value")
 locked_v, n_v = V("shop locked"), V("shop n")
-# posiciones de los botones (se reparten de izquierda a derecha)
 btn_defs = [("buy", "Buy"), ("sell", "Sell"), ("b1", "1"), ("b10", "10"), ("b100", "100"), ("bmax", "Max")]
 bx, cur = {}, R_X0 + 2
 for key, label in btn_defs:
@@ -809,7 +928,6 @@ body += for_range(
           T.if_(T.lt(sv_, 0), T.setv(locked_v, 1)),
           T.setv(sb_, T.math("abs", sv_)),
           T.setv(sy_, T.sub(SH_Y0, T.mul(SH_SP, T.sub(sk, 1)))),
-          # precio segun modo y cantidad
           T.ifelse(T.eq(buy_mode, 1),
                    [T.ifelse(T.eq(bulk, 1),
                              [calc_price.call(sb_), T.setv(n_v, 1)],
@@ -822,61 +940,84 @@ body += for_range(
                     T.ifelse(T.gt(T.item(L_BAMT, sb_), 0), [T.setv(afford_v, 1)], [T.setv(afford_v, 0)])]),
           T.if_(T.eq(locked_v, 1), T.setv(afford_v, 0)),
           T.effect("brightness", 0),
-          T.ifelse(T.eq(afford_v, 1), [T.effect("ghost", 0)], [T.effect("ghost", 45)]),
-          T.if_(T.eq(locked_v, 1), T.effect("ghost", 62)),
+          T.ifelse(T.eq(afford_v, 1), [T.effect("ghost", 0)], [T.effect("ghost", 40)]),
+          T.if_(T.eq(locked_v, 1), T.effect("ghost", 58)),
           T.if_(inside(SH_X, sy_, SH_W / 2, SH_ROW_H / 2), T.effect("brightness", 14)),
           *stamp_at(T.add(C_TILE, T.mod(T.sub(t_e, 1), 4)), SH_X, sy_, 100),
           T.effect("brightness", 0),
-          # icono
-          T.ifelse(T.eq(locked_v, 1),
-                   [T.costume_to(T.item(L_BICON, sb_)), T.effect("brightness", -100)],
-                   [T.costume_to(T.item(L_BICON, sb_))]),
+          T.costume_to(T.item(L_BICON, sb_)),
+          T.if_(T.eq(locked_v, 1), T.effect("brightness", -100)),
           T.size_to(62), T.goto(tile_x0 + 22, sy_), T.pen_stamp(),
           T.effect("brightness", 0),
-          # nombre y precio
           T.ifelse(T.eq(locked_v, 1),
-                   [draw_text.call("???", tile_x0 + 44, T.add(sy_, 7), 66, 0, "w")],
-                   [draw_text.call(T.item(L_BNAME, sb_), tile_x0 + 44, T.add(sy_, 7), 60, 0, "w"),
+                   [draw_text.call("???", tile_x0 + 46, T.add(sy_, 8), 80, 0, "w")],
+                   [T.setv(nm_sz, T.min_(80, T.div(1050, T.length(T.item(L_BNAME, sb_))))),
+                    draw_text.call(T.item(L_BNAME, sb_), tile_x0 + 46, T.add(sy_, 8), nm_sz, 0, "w"),
                     fmt.call(price_v),
-                    *stamp_at(C_MONEY, tile_x0 + 47, T.sub(sy_, 8), 100),
+                    *stamp_at(C_MONEY, tile_x0 + 49, T.sub(sy_, 9), 100),
                     T.ifelse(T.eq(afford_v, 1),
-                             [draw_text.call(fmt_out, tile_x0 + 53, T.sub(sy_, 8), 55, 0, "g")],
-                             [draw_text.call(fmt_out, tile_x0 + 53, T.sub(sy_, 8), 55, 0, "r")]),
+                             [draw_text.call(fmt_out, tile_x0 + 56, T.sub(sy_, 9), 68, 0, "g")],
+                             [draw_text.call(fmt_out, tile_x0 + 56, T.sub(sy_, 9), 68, 0, "r")]),
                     T.if_(T.gt(T.item(L_BAMT, sb_), 0),
-                          draw_text.call(T.item(L_BAMT, sb_), tile_x0 + SH_W - 5, T.sub(sy_, 3), 150, 2, "W"))]),
+                          draw_text.call(T.item(L_BAMT, sb_), tile_x0 + SH_W - 6, T.sub(sy_, 3), 150, 2, "W"))]),
           T.effect("ghost", 0),
           T.if_(inside(SH_X, sy_, SH_W / 2, SH_ROW_H / 2),
                 T.setv(hk, 2), T.setv(hi, T.mul(sb_, T.sub(1, T.mul(2, locked_v)))), T.setv(hy, sy_),
                 T.if_(T.and_(T.eq(clk_ui, 1), T.eq(locked_v, 0)), T.setv(clk_ui, 0), buy_b.call(sb_)))),
 )
+# barra de desplazamiento de la tienda (flechas, carril y deslizador)
+TR_TOP, TR_BOT = SH_Y0 + 18, SH_Y0 - 5 * SH_SP - 18
+sh_max = V("store max scroll")
+body += [
+    T.setv(sh_max, T.max_(0, T.sub(shop_n, SH_ROWS))),
+    *stamp_at(C_TRACK, SB_X, (TR_TOP + TR_BOT) / 2, 100, 0),
+    *stamp_at(C_ARR_UP, SB_X, TR_TOP + 9, 34, 0), *stamp_at(C_ARR_DN, SB_X, TR_BOT - 9, 34, 0),
+    T.if_(T.gt(sh_max, 0),
+          *stamp_at(C_THUMB, SB_X, T.sub(TR_TOP - 12, T.mul(T.div(shop_off, sh_max), (TR_TOP - TR_BOT) - 24)), 100, 0)),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(SB_X, TR_TOP + 9, 8, 9)),
+          T.if_(T.gt(shop_off, 0), T.chg(shop_off, -1)), T.setv(clk_ui, 0)),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(SB_X, TR_BOT - 9, 8, 9)),
+          T.if_(T.lt(shop_off, sh_max), T.chg(shop_off, 1)), T.setv(clk_ui, 0)),
+    T.if_(T.and_(T.eq(clk_ui, 1), inside(SB_X, (TR_TOP + TR_BOT) / 2, 8, (TR_TOP - TR_BOT) / 2)),
+          T.setv(shop_off, T.min_(sh_max, T.max_(0, T.round_(T.mul(T.div(T.sub(TR_TOP, my), TR_TOP - TR_BOT), sh_max))))),
+          T.setv(clk_ui, 0)),
+]
 T.body(draw_shop, *body)
 
-# --- drawLeft: contador, leche, anillo de cursores, mejoras activas -----------------------
+# --- drawLeft: banda del contador, leche, sombra, anillo de cursores y mejoras activas -------
 draw_left = T.defproc("drawLeft", [])
-ring_n_ = V("cursor count")
 ca, sa_, ring_r = V("cursor angle"), V("cursor sin"), V("cursor radius")
+ring_n_ = V("cursor count")
+ck_dist, ck_size = V("cookie distance"), V("cookie size", 100)
 CK_S = 100 / 256                       # escala de la galleta (256 px reales -> 100 unidades)
 body = [
     T.effect("ghost", 0),
-    draw_text.call("Your bakery", LEFT_CX, 172, 82, 1, "W"),
+    *stamp_at(C_BAND, LEFT_CX, 117, 100, 0),
     fmt.call(cookies),
-    T.setv(t_d, T.min_(150, T.div(1450, T.length(fmt_out)))),
-    draw_text.call(fmt_out, LEFT_CX, 149, t_d, 1, "W"),
+    T.setv(t_d, T.min_(150, T.div(1300, T.length(fmt_out)))),
+    draw_text.call(fmt_out, LEFT_CX, 127, t_d, 1, "W"),
     T.ifelse(T.eq(T.math("floor", cookies), 1),
-             [draw_text.call("cookie", LEFT_CX, 128, 92, 1, "W")],
-             [draw_text.call("cookies", LEFT_CX, 128, 92, 1, "W")]),
+             [draw_text.call("cookie", LEFT_CX, 108, 92, 1, "W")],
+             [draw_text.call("cookies", LEFT_CX, 108, 92, 1, "W")]),
     fmt1.call(cps_full),
-    draw_text.call(T.join("per second : ", fmt_out), LEFT_CX, 111, 64, 1, "w"),
-    # leche: nivel segun logros (altura 35 % de la pantalla a partir de 1 de progreso)
+    T.setv(t_d, T.min_(70, T.div(1500, T.length(T.join("per second : ", fmt_out))))),
+    draw_text.call(T.join("per second : ", fmt_out), LEFT_CX, 94, t_d, 1, "w"),
     T.if_(T.gt(milk, 0),
           T.setv(t_a, T.math("floor", milk)),
           T.if_(T.gt(t_a, N_MILK - 1), T.setv(t_a, N_MILK - 1)),
           T.setv(t_b, T.mul(T.min_(1, milk), 126)),
           *stamp_at(T.add(C_MILK0, t_a), LEFT_CX, T.sub(T.add(-180, t_b), T.mul(1.5, T.math("sin", T.mul(T.timer(), 40)))), 100, 4)),
-    # cursores en anillos de 50
+    *stamp_at(C_SHADOW, LEFT_CX, CK_Y - 8, 100, 55),
+    # galleta grande (dibujada con el lapiz para que los cuadros de ayuda queden por encima)
+    T.setv(ck_dist, T.math("sqrt", T.add(T.mul(T.sub(mx, LEFT_CX), T.sub(mx, LEFT_CX)),
+                                          T.mul(T.sub(my, CK_Y), T.sub(my, CK_Y))))),
+    T.setv(t_a, 100),
+    T.if_(T.and_(T.lt(ck_dist, 50), T.eq(ov_open, 0)),
+          T.ifelse(T.mousedown(), [T.setv(t_a, 98)], [T.setv(t_a, 105)])),
+    T.setv(ck_size, T.add(ck_size, T.mul(T.sub(t_a, ck_size), 0.45))),
+    *stamp_at(C_COOKIE, LEFT_CX, CK_Y, ck_size, 0),
+    T.if_(T.and_(T.lt(ck_dist, 50), T.eq(clk_ui, 1)), T.setv(clk_ui, 0), T.bcast("cookie click")),
     T.setv(ring_n_, T.item(L_BAMT, 1)),
-]
-body += [
     T.if_(T.gt(ring_n_, 250), T.setv(ring_n_, 250)),
     T.costume_to(C_CURSOR), T.size_to(100), T.effect("ghost", 0),
     *for_range(
@@ -890,21 +1031,22 @@ body += [
         T.direction_to(T.add(90, ca)),
         T.pen_stamp()),
     T.direction_to(90),
-    # mejoras activas (frenzy, click frenzy, building special)
-    T.setv(t_a, 96),
+    T.setv(t_a, 76),
     T.if_(T.gt(frenzy_t, 0),
           fmt1.call(T.math("ceiling", frenzy_t)),
-          draw_text.call(T.join("Frenzy x7 : ", T.join(fmt_out, "s")), LEFT_CX, t_a, 58, 1, "y"),
-          T.chg(t_a, -12)),
+          draw_text.call(T.join("Frenzy x7 : ", T.join(fmt_out, "s")), LEFT_CX, t_a, 66, 1, "y"),
+          T.chg(t_a, -13)),
     T.if_(T.gt(click_t, 0),
           fmt1.call(T.math("ceiling", click_t)),
-          draw_text.call(T.join("Click frenzy x777 : ", T.join(fmt_out, "s")), LEFT_CX, t_a, 58, 1, "y"),
-          T.chg(t_a, -12)),
+          draw_text.call(T.join("Click frenzy x777 : ", T.join(fmt_out, "s")), LEFT_CX, t_a, 62, 1, "y"),
+          T.chg(t_a, -13)),
     T.if_(T.gt(bb_t, 0),
           fmt1.call(T.math("ceiling", bb_t)),
           draw_text.call(T.join(T.item(L_BNAME, bb_idx), T.join(" x", T.join(T.round_(bb_pow), T.join(" : ", T.join(fmt_out, "s"))))),
-                         LEFT_CX, t_a, 54, 1, "y"),
-          T.chg(t_a, -12)),
+                         LEFT_CX, t_a, 62, 1, "y"),
+          T.chg(t_a, -13)),
+    *stamp_at(C_PILL, LEFT_CX, -166, 100, 0),
+    draw_text.call("Your bakery", LEFT_CX, -166, 88, 1, "W"),
 ]
 T.body(draw_left, *body)
 
@@ -918,53 +1060,57 @@ T.body(
             T.replace(L_PT, pk, T.add(T.item(L_PT, pk), dt)),
             T.ifelse(T.gt(T.item(L_PT, pk), 1.4),
                      [T.delitem(L_PX, pk), T.delitem(L_PY, pk), T.delitem(L_PT, pk), T.delitem(L_PTXT, pk)],
-                     [T.effect("ghost", 0),
+                     [T.effect("ghost", T.mul(T.div(T.item(L_PT, pk), 1.4), 100)),
                       draw_text.call(T.item(L_PTXT, pk), T.item(L_PX, pk), T.add(T.item(L_PY, pk), T.mul(T.item(L_PT, pk), 40)),
-                                     110, 1, "w")]),
+                                     120, 1, "W")]),
             T.chg(pk, -1)),
+    T.effect("ghost", 0),
 )
 
 # --- avisos (galleta dorada) y logros ---------------------------------------------------
 draw_notices = T.defproc("drawNotices", [])
+NY = -88
 T.body(
     draw_notices,
     T.effect("ghost", 0),
     T.if_(T.and_(T.gt(notice_kind, 0), T.lt(T.timer(), notice_until)),
           T.ifelse(T.eq(notice_kind, 1),
-                   [draw_text.call("Frenzy!", LEFT_CX, -108, 130, 1, "Y"),
-                    draw_text.call("Cookie production x7 for a while!", LEFT_CX, -124, 55, 1, "y")],
+                   [draw_text.call("Frenzy!", LEFT_CX, NY, 130, 1, "Y"),
+                    draw_text.call("Cookie production x7 for a while!", LEFT_CX, NY - 17, 62, 1, "y")],
                    [T.ifelse(T.eq(notice_kind, 2),
                              [fmt.call(notice_gain),
-                              draw_text.call("Lucky!", LEFT_CX, -108, 130, 1, "Y"),
-                              draw_text.call(T.join("+", T.join(fmt_out, " cookies!")), LEFT_CX, -124, 60, 1, "y")],
+                              draw_text.call("Lucky!", LEFT_CX, NY, 130, 1, "Y"),
+                              draw_text.call(T.join("+", T.join(fmt_out, " cookies!")), LEFT_CX, NY - 17, 66, 1, "y")],
                              [T.ifelse(T.eq(notice_kind, 3),
-                                       [draw_text.call("Click frenzy!", LEFT_CX, -108, 110, 1, "Y"),
-                                        draw_text.call("Clicking power x777 for a while!", LEFT_CX, -124, 55, 1, "y")],
-                                       [draw_text.call("Building special!", LEFT_CX, -108, 100, 1, "Y"),
+                                       [draw_text.call("Click frenzy!", LEFT_CX, NY, 110, 1, "Y"),
+                                        draw_text.call("Clicking power x777 for a while!", LEFT_CX, NY - 17, 62, 1, "y")],
+                                       [draw_text.call("Building special!", LEFT_CX, NY, 100, 1, "Y"),
                                         draw_text.call(T.join(T.item(L_BNAME, bb_idx), " production boosted!"),
-                                                       LEFT_CX, -124, 55, 1, "y")])])])),
+                                                       LEFT_CX, NY - 17, 62, 1, "y")])])])),
     T.if_(T.lt(T.timer(), toast_until),
-          *stamp_at(C_TOAST, LEFT_CX, -158),
-          *stamp_at(toast_icon, LEFT_CX - 56, -158, 38),
-          draw_text.call("Achievement unlocked", LEFT_CX - 36, -150, 46, 0, "y"),
-          draw_text.call(toast_text, LEFT_CX - 36, -165, 52, 0, "w")),
+          *stamp_at(C_TOAST, LEFT_CX, -130),
+          *stamp_at(toast_icon, LEFT_CX - MILK_W / 2 + 18, -130, 44),
+          draw_text.call("Achievement unlocked", LEFT_CX - MILK_W / 2 + 38, -122, 56, 0, "y"),
+          T.setv(nm_sz, T.min_(70, T.div(900, T.length(toast_text)))),
+          draw_text.call(toast_text, LEFT_CX - MILK_W / 2 + 38, -137, nm_sz, 0, "w")),
 )
 
 # --- overlay de logros ------------------------------------------------------------------
 draw_overlay = T.defproc("drawOverlay", [])
 ok_, ox, oy, oi = V("ov slot"), V("ov x"), V("ov y"), V("ov index")
-OV_COLS, OV_ROWS, OV_SP = 12, 12, 25.5
-OV_X0, OV_Y0 = -232 + OV_SP / 2, 138
+OV_COLS, OV_ROWS, OV_SP = 11, 12, 25.5
+OV_X0, OV_Y0 = OV_CX - OV_COLS * OV_SP / 2 + OV_SP / 2, 138
+OV_L = OV_CX - OV_W / 2 + 8
 T.body(
     draw_overlay,
-    *stamp_at(C_OVER, -85, 0, 100, 0),
+    *stamp_at(C_OVER, OV_CX, 0, 100, 0),
     draw_text.call(T.join("Achievements : ", T.join(ach_count, T.join(" / ", T.join(NA, T.join("   Milk : ", T.join(T.round_(T.mul(milk, 100)), "%")))))),
-                   -232, 168, 62, 0, "w"),
-    draw_btn("wide", -85, -168, "Close", 0),
-    T.if_(T.and_(T.eq(clk, 1), inside(-85, -168, BTN_W["wide"] / 2, 8)), T.setv(ov_open, 0), T.setv(clk, 0)),
-    *stamp_at(C_ARR_UP, 40, 170, 40, 0), *stamp_at(C_ARR_DN, 58, 170, 40, 0),
-    T.if_(T.and_(T.eq(clk, 1), inside(40, 170, 9, 9)), T.if_(T.gt(ov_off, 0), T.chg(ov_off, -1)), T.setv(clk, 0)),
-    T.if_(T.and_(T.eq(clk, 1), inside(58, 170, 9, 9)),
+                   OV_L, 168, 76, 0, "w"),
+    draw_btn("wide", OV_CX, -168, "Close", 0),
+    T.if_(T.and_(T.eq(clk, 1), inside(OV_CX, -168, BTN_W["wide"] / 2, 8)), T.setv(ov_open, 0), T.setv(clk, 0)),
+    *stamp_at(C_ARR_UP, OV_CX + 100, 170, 40, 0), *stamp_at(C_ARR_DN, OV_CX + 120, 170, 40, 0),
+    T.if_(T.and_(T.eq(clk, 1), inside(OV_CX + 100, 170, 9, 9)), T.if_(T.gt(ov_off, 0), T.chg(ov_off, -1)), T.setv(clk, 0)),
+    T.if_(T.and_(T.eq(clk, 1), inside(OV_CX + 120, 170, 9, 9)),
           T.if_(T.lt(ov_off, T.max_(0, T.sub(T.math("ceiling", T.div(NA, OV_COLS)), OV_ROWS))), T.chg(ov_off, 1)),
           T.setv(clk, 0)),
     *for_range(
@@ -985,35 +1131,37 @@ T.body(
 # --- panel de estadisticas ---------------------------------------------------------------
 draw_stats = T.defproc("drawStats", [])
 st_y = V("stats y")
-STAT_L, STAT_R = -230, 58
+STAT_L, STAT_R = OV_L, OV_CX + OV_W / 2 - 10
 
 
-def stat_line(label, value_expr_calls):
-    """Una linea de estadistica: etiqueta a la izquierda y valor a la derecha."""
-    return [draw_text.call(label, STAT_L, st_y, 62, 0, "w"), *value_expr_calls,
-            T.chg(st_y, -14)]
+def stat_line(label, calls):
+    return [draw_text.call(label, STAT_L, st_y, 74, 0, "w"), *calls, T.chg(st_y, -15)]
+
+
+def sv(expr):
+    return draw_text.call(expr, STAT_R, st_y, 74, 2, "y")
 
 
 T.body(
     draw_stats,
-    *stamp_at(C_OVER, -85, 0, 100, 0),
-    draw_text.call("Stats", -232, 168, 90, 0, "W"),
-    draw_btn("wide", -85, -168, "Close", 0),
-    T.if_(T.and_(T.eq(clk, 1), inside(-85, -168, BTN_W["wide"] / 2, 8)), T.setv(ov_open, 0), T.setv(clk, 0)),
+    *stamp_at(C_OVER, OV_CX, 0, 100, 0),
+    draw_text.call("Stats", OV_L, 166, 110, 0, "W"),
+    draw_btn("wide", OV_CX, -168, "Close", 0),
+    T.if_(T.and_(T.eq(clk, 1), inside(OV_CX, -168, BTN_W["wide"] / 2, 8)), T.setv(ov_open, 0), T.setv(clk, 0)),
     compute_mouse.call(),
-    T.setv(st_y, 140),
-    *stat_line("Cookies in bank", [fmt.call(cookies), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Cookies baked (all time)", [fmt.call(baked), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Cookies per second", [fmt1.call(cps_full), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Cookies per click", [fmt1.call(mouse_cps), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Hand-made cookies", [fmt.call(handmade), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Cookie clicks", [fmt.call(clicks), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Golden cookies clicked", [draw_text.call(gclicks, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Buildings owned", [fmt.call(build_total), draw_text.call(fmt_out, STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Upgrades owned", [draw_text.call(T.join(up_bought, T.join(" / ", NU)), STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Achievements", [draw_text.call(T.join(ach_count, T.join(" / ", NA)), STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Milk", [draw_text.call(T.join(T.round_(T.mul(milk, 100)), "%"), STAT_R, st_y, 62, 2, "y")]),
-    *stat_line("Golden cookie frequency", [draw_text.call(T.join("x", gold_freq), STAT_R, st_y, 62, 2, "y")]),
+    T.setv(st_y, 136),
+    *stat_line("Cookies in bank", [fmt.call(cookies), sv(fmt_out)]),
+    *stat_line("Cookies baked (all time)", [fmt.call(baked), sv(fmt_out)]),
+    *stat_line("Cookies per second", [fmt1.call(cps_full), sv(fmt_out)]),
+    *stat_line("Cookies per click", [fmt1.call(mouse_cps), sv(fmt_out)]),
+    *stat_line("Hand-made cookies", [fmt.call(handmade), sv(fmt_out)]),
+    *stat_line("Cookie clicks", [fmt.call(clicks), sv(fmt_out)]),
+    *stat_line("Golden cookies clicked", [sv(gclicks)]),
+    *stat_line("Buildings owned", [fmt.call(build_total), sv(fmt_out)]),
+    *stat_line("Upgrades owned", [sv(T.join(up_bought, T.join(" / ", NU)))]),
+    *stat_line("Achievements", [sv(T.join(ach_count, T.join(" / ", NA)))]),
+    *stat_line("Milk", [sv(T.join(T.round_(T.mul(milk, 100)), "%"))]),
+    *stat_line("Golden cookie frequency", [sv(T.join("x", gold_freq))]),
 )
 
 # --- tooltip ----------------------------------------------------------------------------
@@ -1021,47 +1169,48 @@ draw_tip = T.defproc("drawTooltip", [])
 tl1, tl2, tl3 = V("tip line 1"), V("tip line 2"), V("tip line 3")
 tip_each, tip_tot, tip_pct, tip_ns = V("tip each"), V("tip total"), V("tip percent"), V("tip name size")
 TIP_CX = TIP_RX - TIP_W / 2
-TIP_L = TIP_RX - TIP_W + 7
+TIP_L = TIP_RX - TIP_W + 9
+TS = 60                                                   # tamano del texto de las descripciones
 tip_body = [
     T.effect("ghost", 0),
     T.setv(tip_top, T.add(T.min_(T.max_(hy, -180 + TIP_H / 2), 180 - TIP_H / 2), TIP_H / 2)),
     *stamp_at(C_TIP, TIP_CX, T.sub(tip_top, TIP_H / 2)),
     # --- mejora
     T.if_(T.eq(hk, 1),
-          *stamp_at(T.item(L_UICON, hi), TIP_L + 16, T.sub(tip_top, 22), 52),
-          T.setv(tip_ns, T.min_(68, T.div(1800, T.length(T.item(L_UNAME, hi))))),
-          draw_text.call(T.item(L_UNAME, hi), TIP_L + 36, T.sub(tip_top, 14), tip_ns, 0, "w"),
+          *stamp_at(T.item(L_UICON, hi), TIP_L + 17, T.sub(tip_top, 25), 56),
+          T.setv(tip_ns, T.min_(80, T.div(2300, T.length(T.item(L_UNAME, hi))))),
+          draw_text.call(T.item(L_UNAME, hi), TIP_L + 40, T.sub(tip_top, 15), tip_ns, 0, "w"),
           fmt.call(T.item(L_UPRICE, hi)),
           T.ifelse(T.lt(cookies, T.item(L_UPRICE, hi)),
-                   [draw_text.call(fmt_out, TIP_RX - 8, T.sub(tip_top, 28), 62, 2, "r")],
-                   [draw_text.call(fmt_out, TIP_RX - 8, T.sub(tip_top, 28), 62, 2, "g")]),
-          draw_text.call("[Upgrade]", TIP_L + 36, T.sub(tip_top, 28), 48, 0, "y"),
-          draw_text.call(T.item(L_UD[0], hi), TIP_L, T.sub(tip_top, 48), 50, 0, "w"),
-          draw_text.call(T.item(L_UD[1], hi), TIP_L, T.sub(tip_top, 60), 50, 0, "w"),
-          draw_text.call(T.item(L_UD[2], hi), TIP_L, T.sub(tip_top, 72), 50, 0, "w")),
+                   [draw_text.call(fmt_out, TIP_RX - 9, T.sub(tip_top, 33), 72, 2, "r")],
+                   [draw_text.call(fmt_out, TIP_RX - 9, T.sub(tip_top, 33), 72, 2, "g")]),
+          draw_text.call("[Upgrade]", TIP_L + 40, T.sub(tip_top, 33), 58, 0, "y"),
+          draw_text.call(T.item(L_UD[0], hi), TIP_L, T.sub(tip_top, 55), TS, 0, "w"),
+          draw_text.call(T.item(L_UD[1], hi), TIP_L, T.sub(tip_top, 68), TS, 0, "w"),
+          draw_text.call(T.item(L_UD[2], hi), TIP_L, T.sub(tip_top, 81), TS, 0, "w")),
     # --- edificio
     T.if_(T.eq(hk, 2),
           T.setv(tip_each, T.mul(T.item(L_BEACH, hi), T.mul(gmult, T.mul(cat_mult, buff_mult)))),
           T.setv(tip_tot, T.mul(tip_each, T.item(L_BAMT, hi))),
           T.setv(tip_pct, 0),
           T.if_(T.gt(cps_full, 0), T.setv(tip_pct, T.round_(T.mul(T.div(tip_tot, cps_full), 100)))),
-          *stamp_at(T.item(L_BICON, hi), TIP_L + 16, T.sub(tip_top, 22), 52),
-          draw_text.call(T.item(L_BNAME, hi), TIP_L + 36, T.sub(tip_top, 14), 68, 0, "w"),
+          *stamp_at(T.item(L_BICON, hi), TIP_L + 17, T.sub(tip_top, 25), 56),
+          draw_text.call(T.item(L_BNAME, hi), TIP_L + 40, T.sub(tip_top, 15), 80, 0, "w"),
           calc_price.call(hi), fmt.call(price_v),
           T.ifelse(T.lt(cookies, price_v),
-                   [draw_text.call(fmt_out, TIP_RX - 8, T.sub(tip_top, 28), 62, 2, "r")],
-                   [draw_text.call(fmt_out, TIP_RX - 8, T.sub(tip_top, 28), 62, 2, "g")]),
-          draw_text.call(T.join("owned : ", T.item(L_BAMT, hi)), TIP_L + 36, T.sub(tip_top, 28), 48, 0, "y"),
+                   [draw_text.call(fmt_out, TIP_RX - 9, T.sub(tip_top, 33), 72, 2, "r")],
+                   [draw_text.call(fmt_out, TIP_RX - 9, T.sub(tip_top, 33), 72, 2, "g")]),
+          draw_text.call(T.join("owned : ", T.item(L_BAMT, hi)), TIP_L + 40, T.sub(tip_top, 33), 58, 0, "y"),
           fmt1.call(tip_each),
           T.setv(tl1, T.join("each ", T.join(T.item(L_BSING, hi), T.join(" produces ", T.join(fmt_out, " cookies per second"))))),
-          draw_text.call(tl1, TIP_L, T.sub(tip_top, 48), 48, 0, "w"),
+          draw_text.call(tl1, TIP_L, T.sub(tip_top, 55), TS, 0, "w"),
           T.if_(T.gt(T.item(L_BAMT, hi), 0),
                 fmt1.call(tip_tot),
                 T.setv(tl2, T.join(T.item(L_BAMT, hi), T.join(" ", T.join(T.item(L_BPLUR, hi), T.join(" producing ", T.join(fmt_out, " cookies per second")))))),
-                draw_text.call(tl2, TIP_L, T.sub(tip_top, 60), 48, 0, "w"),
-                draw_text.call(T.join("(", T.join(tip_pct, "% of total CpS)")), TIP_L, T.sub(tip_top, 72), 48, 0, "w"),
+                draw_text.call(tl2, TIP_L, T.sub(tip_top, 68), TS, 0, "w"),
+                draw_text.call(T.join("(", T.join(tip_pct, "% of total CpS)")), TIP_L, T.sub(tip_top, 81), TS, 0, "w"),
                 fmt.call(T.item(L_BTOT, hi)),
-                draw_text.call(T.join(fmt_out, " cookies produced so far"), TIP_L, T.sub(tip_top, 84), 48, 0, "w"))),
+                draw_text.call(T.join(fmt_out, " cookies produced so far"), TIP_L, T.sub(tip_top, 94), TS, 0, "w"))),
     # --- logro
     T.if_(T.eq(hk, 3),
           T.setv(tl1, T.item(L_AD[0], hi)), T.setv(tl2, T.item(L_AD[1], hi)),
@@ -1072,20 +1221,19 @@ tip_body = [
                 T.if_(T.eq(t_a, G.A_BANK), T.setv(tl1, T.join("Bake ", T.join(fmt_out, " cookies in one ascension.")))),
                 T.if_(T.eq(t_a, G.A_CPS), T.setv(tl1, T.join("Bake ", T.join(fmt_out, " cookies per second.")))),
                 T.if_(T.eq(t_a, G.A_MAKE),
-                      T.setv(tl1, T.join("Make ", T.join(fmt_out, T.join(" just from ", T.join(T.item(L_BPLUR, T.item(L_AA, hi)), ".")))))))
-          ,
+                      T.setv(tl1, T.join("Make ", T.join(fmt_out, T.join(" just from ", T.join(T.item(L_BPLUR, T.item(L_AA, hi)), "."))))))),
           T.ifelse(T.eq(T.item(L_AWON, hi), 1),
-                   [*stamp_at(T.item(L_AICON, hi), TIP_L + 16, T.sub(tip_top, 22), 52),
-                    T.setv(tip_ns, T.min_(64, T.div(1800, T.length(T.item(L_ANAME, hi))))),
-                    draw_text.call(T.item(L_ANAME, hi), TIP_L + 36, T.sub(tip_top, 14), tip_ns, 0, "w"),
-                    draw_text.call("[Achievement]", TIP_L + 36, T.sub(tip_top, 28), 48, 0, "y"),
-                    draw_text.call(tl1, TIP_L, T.sub(tip_top, 48), 50, 0, "w"),
-                    draw_text.call(tl2, TIP_L, T.sub(tip_top, 60), 50, 0, "w")],
-                   [*stamp_at(C_UNKNOWN, TIP_L + 16, T.sub(tip_top, 22), 52),
-                    draw_text.call("???", TIP_L + 36, T.sub(tip_top, 14), 64, 0, "w"),
-                    draw_text.call("[Locked]", TIP_L + 36, T.sub(tip_top, 28), 48, 0, "r"),
-                    draw_text.call(tl1, TIP_L, T.sub(tip_top, 48), 50, 0, "w"),
-                    draw_text.call(tl2, TIP_L, T.sub(tip_top, 60), 50, 0, "w")])),
+                   [*stamp_at(T.item(L_AICON, hi), TIP_L + 17, T.sub(tip_top, 25), 56),
+                    T.setv(tip_ns, T.min_(80, T.div(2300, T.length(T.item(L_ANAME, hi))))),
+                    draw_text.call(T.item(L_ANAME, hi), TIP_L + 40, T.sub(tip_top, 15), tip_ns, 0, "w"),
+                    draw_text.call("[Achievement]", TIP_L + 40, T.sub(tip_top, 33), 58, 0, "y"),
+                    draw_text.call(tl1, TIP_L, T.sub(tip_top, 55), TS, 0, "w"),
+                    draw_text.call(tl2, TIP_L, T.sub(tip_top, 68), TS, 0, "w")],
+                   [*stamp_at(C_UNKNOWN, TIP_L + 17, T.sub(tip_top, 25), 56),
+                    draw_text.call("???", TIP_L + 40, T.sub(tip_top, 15), 80, 0, "w"),
+                    draw_text.call("[Locked]", TIP_L + 40, T.sub(tip_top, 33), 58, 0, "r"),
+                    draw_text.call(tl1, TIP_L, T.sub(tip_top, 55), TS, 0, "w"),
+                    draw_text.call(tl2, TIP_L, T.sub(tip_top, 68), TS, 0, "w")])),
 ]
 T.body(draw_tip, *tip_body)
 
@@ -1099,14 +1247,15 @@ T.body(
     T.setv(clk_ui, clk),
     T.if_(T.gt(ov_open, 0), T.setv(clk_ui, 0)),
     build_store.call(),
+    draw_ticker.call(),
     draw_left.call(),
     draw_center.call(),
     draw_up.call(),
     draw_shop.call(),
-    T.if_(T.eq(ov_open, 1), draw_overlay.call()),
-    T.if_(T.eq(ov_open, 2), draw_stats.call()),
     draw_particles.call(),
     draw_notices.call(),
+    T.if_(T.eq(ov_open, 1), draw_overlay.call()),
+    T.if_(T.eq(ov_open, 2), draw_stats.call()),
     T.if_(T.gt(hk, 0), draw_tip.call()),
     T.hide(),
 )
@@ -1121,7 +1270,7 @@ init = [
     T.setv(buy_mode, 1), T.setv(bulk, 1), T.setv(shop_off, 0), T.setv(up_off, 0), T.setv(cen_off, 0),
     T.setv(ov_open, 0), T.setv(ov_off, 0), T.setv(was_down, 0), T.setv(clk, 0), T.setv(dirty_up, 1),
     T.setv(toast_until, 0), T.setv(notice_until, 0), T.setv(notice_kind, 0), T.setv(need_recalc, 0),
-    T.setv(chk_t, 0),
+    T.setv(chk_t, 0), T.setv(tick_cur, 0), T.setv(tick_clicks, 0), T.setv(tick_t0, 0),
     *[T.delall(l) for l in (L_BAMT, L_BTOT, L_BTIER, L_BJOB, L_BBUFF, L_BEACH, L_USTATE, L_AWON, L_PX, L_PY, L_PT, L_PTXT)],
     T.repeat(N, T.addto(L_BAMT, 0), T.addto(L_BTOT, 0), T.addto(L_BTIER, 0), T.addto(L_BJOB, 0),
              T.addto(L_BBUFF, 1), T.addto(L_BEACH, 0)),
@@ -1185,6 +1334,8 @@ T.script(
 # logros que dependen de eventos de la galleta dorada y gancho de pruebas
 h = T.whenbcast("win early bird")
 T.script(h, win.call(ACH_IDX["Early bird"]))
+h = T.whenbcast("win tabloid")
+T.script(h, win.call(ACH_IDX["Tabloid addiction"]))
 h = T.whenbcast("win fading luck")
 T.script(h, win.call(ACH_IDX["Fading luck"]))
 h = T.whenbcast("recalc")
@@ -1207,26 +1358,6 @@ for key, delta in (("up arrow", -1), ("down arrow", 1)):
                            [T.if_(T.gt(T.mousex(), CEN_L),
                                   T.setv(cen_off, T.min_(T.max_(0, T.add(cen_off, delta)), T.max_(0, T.sub(T.sub(N, 1), CROWS)))))])]),
     )
-
-# ======================================================================================
-# Sprite "Big cookie"
-# ======================================================================================
-cookie = Target(P, "Big cookie")
-cookie.pos = (LEFT_CX, CK_Y)
-cookie.costumes = [P.costume("perfectCookie", load("perfectCookie.png").resize((200, 200), Image.LANCZOS), 2)]
-h = cookie.whenflag()
-cookie.script(
-    h, cookie.goto(LEFT_CX, CK_Y), cookie.show(),
-    cookie.forever(
-        cookie.ifelse(cookie.gt(ov_open, 0),
-                      [cookie.hide()],
-                      [cookie.show(),
-                       cookie.ifelse(cookie.touching_mouse(),
-                                     [cookie.ifelse(cookie.mousedown(), [cookie.size_to(98)], [cookie.size_to(105)])],
-                                     [cookie.size_to(100)])])),
-)
-h = cookie.whenclicked()
-cookie.script(h, cookie.bcast("cookie click"))
 
 # ======================================================================================
 # Sprite "Golden cookie": Frenzy, Lucky, Click frenzy y Building special
@@ -1323,7 +1454,7 @@ gold.script(h, gold.setv(g_clicked, 1))
 # ======================================================================================
 # Ensamblado
 # ======================================================================================
-targets = [stage.to_json(0), cookie.to_json(1), ui.to_json(2), gold.to_json(3)]
+targets = [stage.to_json(0), ui.to_json(1), gold.to_json(2)]
 P.write(OUT, targets)
 nblocks = sum(len(t["blocks"]) for t in targets)
 print(f"{OUT}: {os.path.getsize(OUT) / 1024:.0f} KB, {nblocks} bloques, {len(P.assets)} recursos, "
