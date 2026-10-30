@@ -122,6 +122,37 @@ const Modules = {
         'enemy:killed'(e, n, scene) { scene.player.addBuff('speed', 2.0 + n, 1.35); },
       },
     },
+    orbit: {
+      name: 'Satélites de datos', letter: 'R', color: 0x00f0ff, max: 3,
+      desc: 'Un satélite orbita contigo: daña enemigos y bloquea balas.',
+      onAcquire(player) { player.addOrbiter(null); },
+    },
+    mine: {
+      name: 'Minas de fase', letter: 'M', color: 0xff9a3c, max: 2,
+      desc: 'Cada dash deja una mina que explota al acercarse un enemigo.',
+      hooks: {
+        'player:dash'(e, n, scene) { scene.spawnMine(scene.player.x, scene.player.y, scene.player.baseDamage() * (1.6 + 0.6 * n)); },
+      },
+    },
+    crit: {
+      name: 'Núcleo crítico', letter: 'K', color: 0xff2bd6, max: 3,
+      desc: '+12 % de probabilidad de golpe crítico (daño x2).',
+      mod(spec, n) { spec.crit = (spec.crit || 0) + 0.12 * n; },
+    },
+    magnet: {
+      name: 'Imán de créditos', letter: 'N', color: 0xffe94d, max: 2,
+      desc: 'Atrae créditos, llaves y corazones desde más lejos.',
+    },
+    nova: {
+      name: 'Onda de choque', letter: 'W', color: 0x9b5cff, max: 2,
+      desc: 'Cada pocas bajas liberas una onda que daña a tu alrededor.',
+      hooks: {
+        'enemy:killed'(e, n, scene) {
+          scene.novaKills = (scene.novaKills || 0) + 1;
+          if (scene.novaKills >= 9 - 2 * n) { scene.novaKills = 0; scene.shockwave(scene.player.x, scene.player.y, 130 + 25 * n, scene.player.baseDamage() * 1.5, 0, 0x9b5cff, false); }
+        },
+      },
+    },
     echo: {
       name: 'Eco de dash', letter: 'D', color: 0xff2bd6, max: 2,
       desc: 'El dash deja una estela dañina (con "Rastro incendiario" arde).',

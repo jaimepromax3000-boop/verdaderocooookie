@@ -40,80 +40,278 @@ class BootScene extends Phaser.Scene {
     g.closePath(); g.fillPath(); g.strokePath();
   }
 
+  ngon(cx, cy, r, n, rot = 0) {
+    const p = [];
+    for (let i = 0; i < n; i++) p.push([cx + r * Math.cos(rot + (i * 2 * Math.PI) / n), cy + r * Math.sin(rot + (i * 2 * Math.PI) / n)]);
+    return p;
+  }
+
   makeTextures() {
+    this.makeShips();
+    this.makeEnemies();
+    this.makeProps();
+    this.makeTiles();
+  }
+
+  // ---------------------------------------------------------------------------------------
+  makeShips() {
+    // Hacker de Almas: ala delta cian, cabina blanca, motor naranja
+    this.tex('ship_hacker', 40, 40, g => {
+      this.glow(g, 20, 20, 20, 0x00f0ff, 0.06);
+      g.fillStyle(0xff9a3c, 0.85); g.fillTriangle(16, 31, 24, 31, 20, 39);
+      g.fillStyle(0xffe94d, 0.9); g.fillTriangle(18, 31, 22, 31, 20, 36);
+      this.poly(g, [[20, 3], [35, 33], [26, 29], [20, 35], [14, 29], [5, 33]], 0x0a2a44, 0x00f0ff, 2, 0.95);
+      this.poly(g, [[20, 9], [27, 27], [20, 23], [13, 27]], 0x00f0ff, 0xcffcff, 1, 0.35);
+      g.lineStyle(2, 0xff2bd6, 1); g.lineBetween(7, 31, 12, 22); g.lineBetween(33, 31, 28, 22);
+      g.fillStyle(0xffffff, 1); g.fillCircle(20, 17, 3); g.lineStyle(1, 0x00f0ff, 1); g.strokeCircle(20, 17, 5);
+    });
+    // Fantasma: dardo esbelto magenta con aletas traseras translúcidas
+    this.tex('ship_ghost', 40, 40, g => {
+      this.glow(g, 20, 20, 20, 0xff2bd6, 0.06);
+      g.fillStyle(0x9b5cff, 0.8); g.fillTriangle(17, 32, 23, 32, 20, 40);
+      this.poly(g, [[3, 36], [14, 22], [14, 31]], 0x9b5cff, 0x9b5cff, 1, 0.3);
+      this.poly(g, [[37, 36], [26, 22], [26, 31]], 0x9b5cff, 0x9b5cff, 1, 0.3);
+      this.poly(g, [[20, 2], [25, 18], [30, 35], [20, 29], [10, 35], [15, 18]], 0x2a0a3a, 0xff2bd6, 2, 0.95);
+      g.lineStyle(1, 0xffffff, 0.7); g.lineBetween(20, 8, 20, 26);
+      this.poly(g, [[20, 13], [23, 18], [20, 23], [17, 18]], 0xffffff, 0xffffff, 1, 1);
+    });
+    // Daemon: casco hexagonal robusto con cañón y vainas laterales
+    this.tex('ship_daemon', 44, 44, g => {
+      this.glow(g, 22, 22, 22, 0xffe94d, 0.06);
+      g.fillStyle(0xff9a3c, 0.85); g.fillTriangle(17, 36, 27, 36, 22, 44);
+      g.fillStyle(0x2a2208, 1); g.lineStyle(2, 0xffe94d, 1);
+      g.fillRect(3, 14, 7, 20); g.strokeRect(3, 14, 7, 20); g.fillRect(34, 14, 7, 20); g.strokeRect(34, 14, 7, 20);
+      g.fillRect(19, 0, 6, 11); g.strokeRect(19, 0, 6, 11);
+      this.poly(g, [[22, 6], [35, 13], [35, 31], [22, 40], [9, 31], [9, 13]], 0x2a2208, 0xffe94d, 2, 0.95);
+      g.lineStyle(1, 0xffe94d, 0.6); g.strokeCircle(22, 23, 9); g.lineBetween(9, 22, 35, 22);
+      g.fillStyle(0xff9a3c, 1); g.fillCircle(22, 23, 4); g.fillStyle(0xffffff, 1); g.fillCircle(22, 23, 1.8);
+    });
+    this.tex('player', 40, 40, g => { this.poly(g, [[20, 3], [35, 33], [20, 27], [5, 33]], 0xffffff, 0xffffff, 2, 0.3); });
+  }
+
+  // ---------------------------------------------------------------------------------------
+  makeEnemies() {
     const W = 0xffffff;
-    // jugador (apunta hacia arriba; se tiñe con el color del personaje)
-    this.tex('player', 32, 32, g => {
-      this.glow(g, 16, 16, 16, W, 0.07);
-      this.poly(g, [[16, 3], [28, 27], [16, 21], [4, 27]], W, W, 2, 0.3);
-      g.fillStyle(W, 1); g.fillCircle(16, 16, 2.5);
+    // Virus: erizo de 8 púas
+    this.tex('enemy_grunt', 36, 36, g => {
+      this.glow(g, 18, 18, 18, 0xff4466, 0.07);
+      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; this.poly(g, [[18 + 10 * Math.cos(a - 0.22), 18 + 10 * Math.sin(a - 0.22)], [18 + 17 * Math.cos(a), 18 + 17 * Math.sin(a)], [18 + 10 * Math.cos(a + 0.22), 18 + 10 * Math.sin(a + 0.22)]], 0xff4466, 0xff4466, 1, 0.5); }
+      g.fillStyle(0x2a0a14, 1); g.fillCircle(18, 18, 10); g.lineStyle(2, 0xff4466, 1); g.strokeCircle(18, 18, 10);
+      g.fillStyle(W, 1); g.fillCircle(18, 18, 3.5); g.fillStyle(0xff4466, 1); g.fillCircle(18, 18, 1.8);
     });
-    // enemigos (colores propios)
-    this.tex('enemy_grunt', 32, 32, g => {
-      this.glow(g, 16, 16, 16, 0xff4466, 0.08);
-      this.poly(g, [[16, 3], [28, 16], [16, 29], [4, 16]], 0xff4466, 0xff4466, 2, 0.3);
-      g.lineStyle(2, 0xffffff, 0.9); g.lineBetween(10, 16, 22, 16); g.lineBetween(16, 10, 16, 22);
+    // Centinela: torreta cuadrada con cañón
+    this.tex('enemy_shooter', 36, 36, g => {
+      this.glow(g, 18, 18, 18, 0xff9a3c, 0.07);
+      g.fillStyle(0xff9a3c, 0.9); g.fillRect(15, 0, 6, 14);
+      this.poly(g, [[7, 7], [29, 7], [29, 29], [7, 29]], 0x2a1608, 0xff9a3c, 2, 0.95);
+      g.lineStyle(1, 0xff9a3c, 0.7); g.strokeRect(11, 11, 14, 14);
+      g.fillStyle(W, 1); g.fillCircle(18, 18, 3.5); g.fillStyle(0xff9a3c, 1); g.fillCircle(18, 18, 1.8);
+      g.fillStyle(0xff9a3c, 1); for (const [x, y] of [[9, 9], [27, 9], [9, 27], [27, 27]]) g.fillCircle(x, y, 1.5);
     });
-    this.tex('enemy_shooter', 32, 32, g => {
-      this.glow(g, 16, 16, 16, 0xff9a3c, 0.08);
-      g.fillStyle(0xff9a3c, 0.25); g.lineStyle(2, 0xff9a3c, 1);
-      g.fillRect(5, 5, 22, 22); g.strokeRect(5, 5, 22, 22);
-      g.fillStyle(0xffffff, 1); g.fillCircle(16, 16, 4);
-      g.lineStyle(3, 0xffffff, 1); g.lineBetween(16, 16, 16, 2);
+    // Invocador: octógono con nodos orbitales
+    this.tex('enemy_summoner', 40, 40, g => {
+      this.glow(g, 20, 20, 20, 0xff2bd6, 0.07);
+      this.poly(g, this.ngon(20, 20, 16, 8, Math.PI / 8), 0x2a0a2a, 0xff2bd6, 2, 0.95);
+      g.lineStyle(1, 0xff2bd6, 0.6); g.strokeCircle(20, 20, 10);
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + 0.4; g.fillStyle(0xff2bd6, 1); g.fillCircle(20 + 10 * Math.cos(a), 20 + 10 * Math.sin(a), 2.4); }
+      g.fillStyle(W, 1); g.fillCircle(20, 20, 3.5);
     });
-    this.tex('enemy_summoner', 36, 36, g => {
-      this.glow(g, 18, 18, 18, 0xff2bd6, 0.08);
-      const pts = []; for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + Math.PI / 8; pts.push([18 + 15 * Math.cos(a), 18 + 15 * Math.sin(a)]); }
-      this.poly(g, pts, 0xff2bd6, 0xff2bd6, 2, 0.28);
-      g.lineStyle(2, 0xffffff, 0.9); g.strokeCircle(18, 18, 7); g.fillStyle(0xffffff, 1); g.fillCircle(18, 18, 2.5);
+    this.tex('enemy_drone', 24, 24, g => {
+      this.glow(g, 12, 12, 12, 0xffe94d, 0.07);
+      this.poly(g, [[12, 2], [21, 20], [12, 16], [3, 20]], 0xffe94d, 0xffe94d, 2, 0.5);
+      g.fillStyle(W, 1); g.fillCircle(12, 11, 2);
     });
-    this.tex('enemy_drone', 22, 22, g => {
-      this.poly(g, [[11, 2], [20, 19], [2, 19]], 0xffe94d, 0xffe94d, 2, 0.35);
+    // Francotirador: rombo largo con mira
+    this.tex('enemy_sniper', 36, 36, g => {
+      this.glow(g, 18, 18, 18, 0xb6ff3c, 0.07);
+      this.poly(g, [[18, 0], [26, 18], [18, 34], [10, 18]], 0x142a08, 0xb6ff3c, 2, 0.95);
+      g.lineStyle(1, 0xb6ff3c, 0.8); g.strokeCircle(18, 18, 6); g.lineBetween(18, 6, 18, 30); g.lineBetween(12, 18, 24, 18);
+      g.fillStyle(W, 1); g.fillCircle(18, 18, 2);
     });
-    this.tex('enemy_boss', 84, 84, g => {
-      this.glow(g, 42, 42, 42, 0xff2bd6, 0.07);
-      const hex = (r, c, a) => { const p = []; for (let i = 0; i < 6; i++) p.push([42 + r * Math.cos(i * Math.PI / 3), 42 + r * Math.sin(i * Math.PI / 3)]); this.poly(g, p, c, c, 3, a); };
-      hex(38, 0x9b5cff, 0.18); hex(26, 0xff2bd6, 0.3);
-      g.fillStyle(0xffffff, 1); g.fillCircle(42, 42, 7);
-      g.lineStyle(3, 0xffffff, 0.8); g.strokeCircle(42, 42, 14);
+    // Blindado: casco pesado con placas
+    this.tex('enemy_tank', 44, 44, g => {
+      this.glow(g, 22, 22, 22, 0xff6a4c, 0.07);
+      this.poly(g, this.ngon(22, 22, 20, 6, Math.PI / 6), 0x2a1210, 0xff6a4c, 3, 0.95);
+      this.poly(g, this.ngon(22, 22, 13, 6, Math.PI / 6), 0x3a1a16, 0xff9a3c, 2, 0.9);
+      g.lineStyle(2, 0xff6a4c, 0.8); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3 + Math.PI / 6; g.lineBetween(22 + 13 * Math.cos(a), 22 + 13 * Math.sin(a), 22 + 20 * Math.cos(a), 22 + 20 * Math.sin(a)); }
+      g.fillStyle(0xffe94d, 1); g.fillCircle(22, 22, 5); g.fillStyle(W, 1); g.fillCircle(22, 22, 2);
     });
-    // proyectiles
-    this.tex('bullet', 16, 16, g => { this.glow(g, 8, 8, 8, W, 0.14); g.fillStyle(W, 1); g.fillCircle(8, 8, 3.5); });
-    this.tex('ebullet', 16, 16, g => { this.glow(g, 8, 8, 8, W, 0.14); g.fillStyle(W, 1); g.fillCircle(8, 8, 4); g.lineStyle(1, 0x000000, 0.4); g.strokeCircle(8, 8, 4); });
+    // Bomba lógica: esfera con franjas de aviso
+    this.tex('enemy_bomber', 32, 32, g => {
+      this.glow(g, 16, 16, 16, 0xffb03c, 0.08);
+      g.fillStyle(0x2a1a08, 1); g.fillCircle(16, 16, 12); g.lineStyle(2, 0xffb03c, 1); g.strokeCircle(16, 16, 12);
+      g.lineStyle(3, 0xffe94d, 0.9); g.lineBetween(7, 9, 12, 5); g.lineBetween(20, 5, 25, 9); g.lineBetween(7, 23, 12, 27); g.lineBetween(20, 27, 25, 23);
+      g.fillStyle(0xff2244, 1); g.fillCircle(16, 16, 5); g.fillStyle(W, 1); g.fillCircle(16, 16, 2);
+    });
+    // Torreta: base circular con cañón
+    this.tex('enemy_turret', 40, 40, g => {
+      this.glow(g, 20, 20, 20, 0xffd23c, 0.07);
+      g.fillStyle(0xffd23c, 1); g.fillRect(17, 0, 6, 17);
+      g.fillStyle(0x2a2208, 1); g.fillCircle(20, 22, 15); g.lineStyle(3, 0xffd23c, 1); g.strokeCircle(20, 22, 15);
+      g.lineStyle(1, 0xffd23c, 0.6); g.strokeCircle(20, 22, 9); for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2 + Math.PI / 4; g.fillStyle(0xffd23c, 1); g.fillCircle(20 + 12 * Math.cos(a), 22 + 12 * Math.sin(a), 1.8); }
+      g.fillStyle(W, 1); g.fillCircle(20, 22, 3.5);
+    });
+    // Espectro: rombo fantasma
+    this.tex('enemy_blinker', 36, 36, g => {
+      this.glow(g, 18, 18, 18, 0x3cf0c8, 0.08);
+      this.poly(g, [[18, 2], [32, 18], [18, 34], [4, 18]], 0x3cf0c8, 0x3cf0c8, 2, 0.2);
+      this.poly(g, [[18, 9], [26, 18], [18, 27], [10, 18]], 0x3cf0c8, W, 1, 0.35);
+      g.fillStyle(W, 1); g.fillCircle(14, 17, 2); g.fillCircle(22, 17, 2);
+    });
+    // Fractal: dos células
+    this.tex('enemy_splitter', 36, 36, g => {
+      this.glow(g, 18, 18, 18, 0x7dff3c, 0.07);
+      g.fillStyle(0x143a08, 1); g.lineStyle(2, 0x7dff3c, 1);
+      g.fillCircle(13, 18, 11); g.strokeCircle(13, 18, 11); g.fillCircle(24, 18, 9); g.strokeCircle(24, 18, 9);
+      g.fillStyle(0x7dff3c, 0.9); g.fillCircle(13, 18, 4); g.fillCircle(24, 18, 3.2);
+      g.fillStyle(W, 1); g.fillCircle(13, 18, 1.6);
+    });
+    // Jefes: uno por planta
+    const boss = (key, main, sub, drawCore) => this.tex(key, 90, 90, g => {
+      this.glow(g, 45, 45, 45, main, 0.07);
+      drawCore(g);
+      g.fillStyle(W, 1); g.fillCircle(45, 45, 7); g.lineStyle(3, W, 0.8); g.strokeCircle(45, 45, 14);
+    });
+    boss('enemy_boss1', 0xff2bd6, 0x9b5cff, g => {                       // Guardián: hexágonos concéntricos
+      this.poly(g, this.ngon(45, 45, 41, 6), 0x9b5cff, 0x9b5cff, 3, 0.18);
+      this.poly(g, this.ngon(45, 45, 29, 6, Math.PI / 6), 0xff2bd6, 0xff2bd6, 3, 0.3);
+      g.lineStyle(2, 0xff2bd6, 0.8); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; g.lineBetween(45 + 29 * Math.cos(a), 45 + 29 * Math.sin(a), 45 + 41 * Math.cos(a), 45 + 41 * Math.sin(a)); }
+    });
+    boss('enemy_boss2', 0xff9a3c, 0xff4466, g => {                       // Hidra: ocho brazos con cabeza
+      for (let i = 0; i < 8; i++) {
+        const a = i * Math.PI / 4;
+        g.lineStyle(5, 0xff4466, 0.9); g.lineBetween(45 + 14 * Math.cos(a), 45 + 14 * Math.sin(a), 45 + 36 * Math.cos(a), 45 + 36 * Math.sin(a));
+        g.fillStyle(0xff9a3c, 1); g.fillCircle(45 + 38 * Math.cos(a), 45 + 38 * Math.sin(a), 5);
+      }
+      this.poly(g, this.ngon(45, 45, 25, 8, Math.PI / 8), 0x3a1608, 0xff9a3c, 3, 0.95);
+      this.poly(g, this.ngon(45, 45, 17, 8), 0xff4466, 0xff4466, 2, 0.4);
+    });
+    boss('enemy_boss3', 0x9b5cff, 0x00f0ff, g => {                       // Núcleo: anillos y rombos
+      g.lineStyle(3, 0x9b5cff, 0.9); g.strokeCircle(45, 45, 40); g.lineStyle(2, 0x00f0ff, 0.7); g.strokeCircle(45, 45, 32);
+      for (let i = 0; i < 4; i++) { const a = i * Math.PI / 2; this.poly(g, [[45 + 42 * Math.cos(a), 45 + 42 * Math.sin(a)], [45 + 30 * Math.cos(a + 0.3), 45 + 30 * Math.sin(a + 0.3)], [45 + 30 * Math.cos(a - 0.3), 45 + 30 * Math.sin(a - 0.3)]], 0x9b5cff, 0x9b5cff, 2, 0.6); }
+      this.poly(g, [[45, 14], [76, 45], [45, 76], [14, 45]], 0x1a0830, 0x9b5cff, 3, 0.95);
+      this.poly(g, [[45, 26], [64, 45], [45, 64], [26, 45]], 0x9b5cff, 0x00f0ff, 2, 0.35);
+    });
+  }
+
+  // ---------------------------------------------------------------------------------------
+  makeProps() {
+    const W = 0xffffff;
+    this.tex('shadow', 32, 32, g => { for (let i = 6; i >= 1; i--) { g.fillStyle(0x000000, 0.1); g.fillCircle(16, 16, 15 * i / 6); } });
+    // proyectiles: el del jugador es alargado (se orienta con su rumbo)
+    this.tex('bullet', 26, 14, g => {
+      this.glow(g, 13, 7, 7, W, 0.08);
+      g.fillStyle(W, 0.35); g.fillRoundedRect(1, 3, 24, 8, 4);
+      g.fillStyle(W, 1); g.fillRoundedRect(5, 5, 16, 4, 2);
+    });
+    this.tex('ebullet', 18, 18, g => { this.glow(g, 9, 9, 9, W, 0.14); g.fillStyle(W, 1); g.fillCircle(9, 9, 4); g.lineStyle(1, 0x000000, 0.4); g.strokeCircle(9, 9, 4); g.lineStyle(1, W, 0.7); g.strokeCircle(9, 9, 6.5); });
     this.tex('spark', 8, 8, g => { g.fillStyle(W, 1); g.fillCircle(4, 4, 3); });
     this.tex('glow', 64, 64, g => this.glow(g, 32, 32, 32, W, 0.16));
     this.tex('fire', 40, 40, g => { this.glow(g, 20, 20, 20, 0xff9a3c, 0.18); g.fillStyle(0xffe94d, 0.8); g.fillCircle(20, 20, 6); });
+    this.tex('orbiter', 20, 20, g => { this.glow(g, 10, 10, 10, 0x00f0ff, 0.14); this.poly(g, [[10, 2], [17, 10], [10, 18], [3, 10]], 0x00f0ff, W, 2, 0.6); });
+    this.tex('mine', 24, 24, g => {
+      this.glow(g, 12, 12, 12, 0xff9a3c, 0.12);
+      g.fillStyle(0x2a1608, 1); g.fillCircle(12, 12, 7); g.lineStyle(2, 0xff9a3c, 1); g.strokeCircle(12, 12, 7);
+      g.lineStyle(2, 0xff9a3c, 1); for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4; g.lineBetween(12 + 7 * Math.cos(a), 12 + 7 * Math.sin(a), 12 + 11 * Math.cos(a), 12 + 11 * Math.sin(a)); }
+      g.fillStyle(0xff2244, 1); g.fillCircle(12, 12, 2.5);
+    });
+    this.tex('barrel', 30, 30, g => {
+      this.glow(g, 15, 15, 15, 0xff4466, 0.1);
+      g.fillStyle(0x3a1408, 1); g.fillCircle(15, 15, 11); g.lineStyle(3, 0xff9a3c, 1); g.strokeCircle(15, 15, 11);
+      g.lineStyle(2, 0xffe94d, 1); g.strokeCircle(15, 15, 6);
+      g.fillStyle(0xffe94d, 1); g.fillTriangle(15, 10, 11, 19, 19, 19); g.fillStyle(0x3a1408, 1); g.fillRect(14, 13, 2, 3); g.fillRect(14, 17, 2, 1.5);
+    });
+    // trampas de pinchos: apagada / aviso / activa
+    const plate = (g, col, a) => { g.fillStyle(0x0a0e1e, 1); g.fillRect(1, 1, 30, 30); g.lineStyle(1, col, a); g.strokeRect(1.5, 1.5, 29, 29); };
+    this.tex('spike_off', 32, 32, g => { plate(g, 0x445080, 0.8); g.fillStyle(0x445080, 1); for (const [x, y] of [[9, 9], [23, 9], [9, 23], [23, 23]]) g.fillCircle(x, y, 2); });
+    this.tex('spike_warn', 32, 32, g => { plate(g, 0xff4466, 1); g.fillStyle(0xff4466, 0.25); g.fillRect(2, 2, 28, 28); g.fillStyle(0xff4466, 1); for (const [x, y] of [[9, 9], [23, 9], [9, 23], [23, 23]]) g.fillCircle(x, y, 3); });
+    this.tex('spike_on', 32, 32, g => {
+      plate(g, 0xff4466, 1); g.fillStyle(0xff4466, 0.2); g.fillRect(2, 2, 28, 28);
+      for (const [x, y] of [[9, 9], [23, 9], [9, 23], [23, 23]]) { g.fillStyle(0xff4466, 1); g.fillTriangle(x, y - 8, x - 5, y + 5, x + 5, y + 5); g.fillStyle(W, 0.9); g.fillTriangle(x, y - 8, x - 1.5, y, x + 1.5, y); }
+    });
     // objetos
-    this.tex('coin', 18, 18, g => { this.poly(g, [[9, 1], [16, 5], [16, 13], [9, 17], [2, 13], [2, 5]], 0xffe94d, 0xffe94d, 2, 0.5); });
-    this.tex('heart', 22, 22, g => {
-      g.fillStyle(0xff4466, 1); g.fillCircle(7, 8, 5.5); g.fillCircle(15, 8, 5.5);
-      g.fillTriangle(2, 10, 20, 10, 11, 20);
+    this.tex('coin', 18, 18, g => { this.glow(g, 9, 9, 9, 0xffe94d, 0.08); this.poly(g, [[9, 1], [16, 5], [16, 13], [9, 17], [2, 13], [2, 5]], 0xffe94d, 0xffe94d, 2, 0.5); g.fillStyle(0xffe94d, 1); g.fillRect(8, 5, 2, 8); });
+    this.tex('heart', 24, 24, g => {
+      this.glow(g, 12, 12, 12, 0xff4466, 0.08);
+      g.fillStyle(0xff4466, 1); g.fillCircle(8, 9, 5.5); g.fillCircle(16, 9, 5.5); g.fillTriangle(3, 11, 21, 11, 12, 21);
+      g.fillStyle(W, 0.6); g.fillCircle(6, 7, 1.8);
     });
-    this.tex('key', 24, 22, g => {
-      g.lineStyle(3, 0xffe94d, 1); g.strokeCircle(7, 11, 5);
-      g.lineBetween(12, 11, 22, 11); g.lineBetween(19, 11, 19, 16); g.lineBetween(22, 11, 22, 15);
+    this.tex('key', 26, 24, g => {
+      this.glow(g, 13, 12, 12, 0xffe94d, 0.07);
+      g.lineStyle(3, 0xffe94d, 1); g.strokeCircle(8, 12, 5);
+      g.lineBetween(13, 12, 23, 12); g.lineBetween(20, 12, 20, 17); g.lineBetween(23, 12, 23, 16);
     });
-    this.tex('module', 28, 28, g => {   // chip de software (se tiñe con el color del módulo)
-      g.fillStyle(W, 0.25); g.lineStyle(2, W, 1); g.fillRect(5, 5, 18, 18); g.strokeRect(5, 5, 18, 18);
+    this.tex('module', 30, 30, g => {   // chip de software (se tiñe con el color del módulo)
+      this.glow(g, 15, 15, 15, W, 0.07);
+      g.fillStyle(W, 0.25); g.lineStyle(2, W, 1); g.fillRect(6, 6, 18, 18); g.strokeRect(6, 6, 18, 18);
       g.lineStyle(2, W, 1);
-      for (let i = 0; i < 3; i++) { const p = 9 + i * 5; g.lineBetween(p, 1, p, 5); g.lineBetween(p, 23, p, 27); g.lineBetween(1, p, 5, p); g.lineBetween(23, p, 27, p); }
-      g.fillStyle(W, 1); g.fillRect(11, 11, 6, 6);
+      for (let i = 0; i < 3; i++) { const p = 10 + i * 5; g.lineBetween(p, 2, p, 6); g.lineBetween(p, 24, p, 28); g.lineBetween(2, p, 6, p); g.lineBetween(24, p, 28, p); }
+      g.fillStyle(W, 1); g.fillRect(12, 12, 6, 6);
     });
     this.tex('weapon', 34, 20, g => {
       g.fillStyle(W, 0.3); g.lineStyle(2, W, 1);
       g.fillRect(3, 6, 22, 8); g.strokeRect(3, 6, 22, 8); g.fillRect(25, 8, 7, 4); g.fillRect(8, 14, 6, 5);
     });
-    this.tex('portal', 40, 40, g => {
-      this.glow(g, 20, 20, 20, 0x00f0ff, 0.12);
-      g.lineStyle(3, 0x00f0ff, 1); g.strokeCircle(20, 20, 14); g.lineStyle(2, 0xff2bd6, 1); g.strokeCircle(20, 20, 8);
-      g.lineBetween(20, 2, 20, 8);
+    this.tex('portal', 44, 44, g => {
+      this.glow(g, 22, 22, 22, 0x00f0ff, 0.12);
+      g.lineStyle(3, 0x00f0ff, 1); g.strokeCircle(22, 22, 15); g.lineStyle(2, 0xff2bd6, 1); g.strokeCircle(22, 22, 9);
+      g.lineStyle(1, 0x00f0ff, 0.8); for (let i = 0; i < 6; i++) { const a = i * Math.PI / 3; g.lineBetween(22 + 15 * Math.cos(a), 22 + 15 * Math.sin(a), 22 + 20 * Math.cos(a), 22 + 20 * Math.sin(a)); }
+      g.fillStyle(W, 1); g.fillCircle(22, 22, 3);
     });
-    // baldosas
-    this.tex('tile_floor', 32, 32, g => { g.fillStyle(0x070b1a, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(1, 0x12204a, 1); g.strokeRect(0.5, 0.5, 31, 31); g.fillStyle(0x0e1a3d, 1); g.fillRect(14, 14, 4, 4); });
-    this.tex('tile_wall', 32, 32, g => { g.fillStyle(0x0b1030, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(2, 0x2748ff, 0.9); g.strokeRect(1, 1, 30, 30); g.lineStyle(1, 0x00f0ff, 0.5); g.strokeRect(5, 5, 22, 22); });
-    this.tex('tile_obs', 32, 32, g => { g.fillStyle(0x1b0b2e, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(2, 0xff2bd6, 0.9); g.strokeRect(1, 1, 30, 30); g.lineStyle(1, 0xff2bd6, 0.4); g.lineBetween(4, 4, 28, 28); g.lineBetween(28, 4, 4, 28); });
-    this.tex('door_closed', 32, 32, g => { g.fillStyle(0x2a0a14, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(3, 0xff4466, 1); for (let i = 4; i < 32; i += 8) g.lineBetween(i, 2, i, 30); g.lineStyle(2, 0xff4466, 1); g.strokeRect(1, 1, 30, 30); });
+    this.tex('door_closed', 32, 32, g => { g.fillStyle(0x2a0a14, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(3, 0xff4466, 1); for (let i = 4; i < 32; i += 8) g.lineBetween(i, 2, i, 30); g.lineStyle(2, 0xff4466, 1); g.strokeRect(1, 1, 30, 30); g.fillStyle(0xff4466, 0.2); g.fillRect(1, 1, 30, 30); });
     this.tex('door_locked', 32, 32, g => { g.fillStyle(0x2a2208, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(3, 0xffe94d, 1); g.strokeRect(2, 2, 28, 28); g.fillStyle(0xffe94d, 1); g.fillRect(11, 14, 10, 9); g.lineStyle(3, 0xffe94d, 1); g.strokeCircle(16, 12, 4); });
     this.tex('vignette', 4, 4, g => { g.fillStyle(0x000000, 1); g.fillRect(0, 0, 4, 4); });
+    this.tex('bg_grid', 64, 64, g => { g.fillStyle(0x000000, 0); g.lineStyle(1, 0xffffff, 0.35); g.lineBetween(0, 0, 64, 0); g.lineBetween(0, 0, 0, 64); g.fillStyle(0xffffff, 0.5); g.fillRect(0, 0, 2, 2); });
+  }
+
+  // ---------------------------------------------------------------------------------------
+  makeTiles() {
+    THEMES.forEach((th, t) => {
+      // suelo: 4 variantes (liso, punto, circuito, rejilla hexagonal)
+      const base = g => { g.fillStyle(th.floor, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(1, th.grid, 1); g.strokeRect(0.5, 0.5, 31, 31); };
+      this.tex(`tile_floor_${t}_0`, 32, 32, base);
+      this.tex(`tile_floor_${t}_1`, 32, 32, g => { base(g); g.fillStyle(th.dot, 1); g.fillRect(14, 14, 4, 4); g.lineStyle(1, th.grid, 0.8); g.lineBetween(14, 16, 18, 16); g.lineBetween(16, 14, 16, 18); });
+      this.tex(`tile_floor_${t}_2`, 32, 32, g => {
+        base(g); g.lineStyle(1, th.edge, 0.32); g.beginPath(); g.moveTo(3, 20); g.lineTo(14, 20); g.lineTo(14, 8); g.lineTo(28, 8); g.strokePath();
+        g.fillStyle(th.edge, 0.5); g.fillCircle(28, 8, 2); g.fillCircle(3, 20, 1.5);
+      });
+      this.tex(`tile_floor_${t}_3`, 32, 32, g => { base(g); g.lineStyle(1, th.grid, 0.9); g.strokePoints(this.ngon(16, 16, 9, 6, Math.PI / 6).map(p => ({ x: p[0], y: p[1] })), true); g.fillStyle(th.dot, 1); g.fillCircle(16, 16, 3); });
+      // pared: panel con remaches
+      this.tex(`tile_wall_${t}`, 32, 32, g => {
+        g.fillStyle(th.wall, 1); g.fillRect(0, 0, 32, 32);
+        g.lineStyle(2, th.edge, 0.85); g.strokeRect(1, 1, 30, 30);
+        g.lineStyle(1, th.edge2, 0.3); g.strokeRect(5, 5, 22, 22);
+        g.lineStyle(1, th.edge, 0.15); g.lineBetween(0, 32, 32, 0); g.lineBetween(0, 16, 16, 0); g.lineBetween(16, 32, 32, 16);
+        g.fillStyle(th.edge2, 0.8); for (const [x, y] of [[4, 4], [28, 4], [4, 28], [28, 28]]) g.fillCircle(x, y, 1.3);
+      });
+      // obstáculo: rack de servidor con leds
+      this.tex(`tile_obs_${t}`, 32, 32, g => {
+        g.fillStyle(th.obs, 1); g.fillRect(0, 0, 32, 32);
+        g.lineStyle(2, th.obsEdge, 0.95); g.strokeRect(1, 1, 30, 30);
+        g.lineStyle(1, th.obsEdge, 0.4); for (const y of [9, 16, 23]) g.lineBetween(5, y, 27, y);
+        for (const [i, y] of [[0, 6], [1, 13], [2, 20], [3, 27]]) { g.fillStyle(i % 2 ? 0x5dff8a : th.obsEdge, 1); g.fillRect(24, y - 1, 3, 2); }
+      });
+      // decoración de suelo
+      this.tex(`decal_${t}_0`, 32, 32, g => { g.lineStyle(1, th.edge, 0.28); g.beginPath(); g.moveTo(0, 12); g.lineTo(10, 12); g.lineTo(14, 18); g.lineTo(32, 18); g.strokePath(); g.fillStyle(th.edge, 0.4); g.fillCircle(10, 12, 1.6); });
+      this.tex(`decal_${t}_1`, 32, 32, g => { g.lineStyle(1, th.edge, 0.22); g.beginPath(); g.moveTo(4, 6); g.lineTo(12, 13); g.lineTo(9, 18); g.lineTo(20, 27); g.strokePath(); g.beginPath(); g.moveTo(12, 13); g.lineTo(22, 11); g.strokePath(); });
+      this.tex(`decal_${t}_2`, 32, 32, g => { g.lineStyle(1, th.edge2, 0.3); g.strokePoints(this.ngon(16, 16, 6, 6).map(p => ({ x: p[0], y: p[1] })), true); g.fillStyle(th.edge2, 0.35); g.fillCircle(16, 16, 1.5); });
+      this.tex(`decal_${t}_3`, 32, 32, g => { g.lineStyle(1, th.edge2, 0.28); for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(8 + i * 5, 10); g.lineTo(13 + i * 5, 16); g.lineTo(8 + i * 5, 22); g.strokePath(); } });
+      // símbolo del suelo (sala de inicio)
+      this.tex(`sigil_${t}`, 288, 288, g => this.sigil(g, th.accent, 3));
+    });
+    this.tex('sigil_boss', 288, 288, g => this.sigil(g, 0xff2bd6, 6));
+    this.tex('sigil_shop', 288, 288, g => this.sigil(g, 0xffe94d, 4));
+    this.tex('sigil_treasure', 288, 288, g => this.sigil(g, 0x5dff8a, 5));
+  }
+
+  /** Anillos concéntricos con marcas y un polígono central (n lados). */
+  sigil(g, col, n) {
+    const c = 144;
+    g.lineStyle(2, col, 0.45); g.strokeCircle(c, c, 134);
+    g.lineStyle(1, col, 0.3); g.strokeCircle(c, c, 118); g.strokeCircle(c, c, 78);
+    for (let i = 0; i < 36; i++) { const a = i * Math.PI / 18; g.lineStyle(i % 3 ? 1 : 2, col, i % 3 ? 0.25 : 0.5); g.lineBetween(c + 118 * Math.cos(a), c + 118 * Math.sin(a), c + 134 * Math.cos(a), c + 134 * Math.sin(a)); }
+    g.lineStyle(2, col, 0.5); g.strokePoints(this.ngon(c, c, 78, n, -Math.PI / 2).map(p => ({ x: p[0], y: p[1] })), true);
+    g.lineStyle(1, col, 0.35); g.strokePoints(this.ngon(c, c, 44, n, Math.PI / 2 - (n % 2 ? 0 : Math.PI / n)).map(p => ({ x: p[0], y: p[1] })), true);
+    g.fillStyle(col, 0.12); g.fillCircle(c, c, 30);
   }
 }

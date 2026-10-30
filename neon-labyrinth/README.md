@@ -14,14 +14,20 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 | Mover (8 direcciones) | WASD / flechas |
 | Apuntar y disparar (360°) | Ratón (mantén pulsado) |
 | Dash con invulnerabilidad | Espacio / Shift |
+| Habilidad activa del personaje | Q / clic derecho |
+| Mapa grande de la planta | mantén Tab |
 | Recoger, comprar, usar portal | E |
 | Pausa | ESC |
 
 ## Bucle de juego
 
 - Sala inicial segura: eliges arma (Pulso, Dispersor, Lanza Riel).
+- 3 personajes con habilidad activa: **Hacker** (Pulso EMP: borra balas y aturde), **Fantasma** (Fase espectral: intangible, rápido y con estela de fuego) y **Daemon** (Enjambre: 3 satélites que dañan y bloquean balas).
+- 3 biomas (Servidores, Red Neuronal, Núcleo Central), cada uno con su paleta, y un jefe distinto por planta.
 - 3 plantas de 10–15 salas; las puertas se sellan al entrar y se abren al matar a todos los enemigos.
 - Al limpiar una sala cae una recompensa visible (créditos, reparación, módulos, llaves).
+- Salas de combate con 1 o 2 oleadas, trampas de pinchos con aviso, barriles explosivos y 12 diseños de obstáculos.
+- Enemigos: Virus, Centinela, Invocador, Dron, Francotirador (aviso láser), Blindado (onda de balas), Bomba lógica, Torreta, Espectro (teletransporte) y Fractal (se divide), más **élites** con afijos (veloz, volátil, blindado).
 - Salas especiales: **Tienda**, **Tesoro** oculto (puerta con llave) y **Jefe** en el punto más lejano.
 - Al morir pierdes lo de la partida, pero conservas los **Fragmentos de Núcleo** para el árbol de habilidades
   permanente (se guarda en `localStorage`).
@@ -38,7 +44,7 @@ src/
 │   ├── EventBus.js             bus de eventos global (base del sistema de sinergias)
 │   ├── StateMachine.js         FSM genérica para la IA
 │   ├── ObjectPool.js           pool de proyectiles y partículas
-│   └── Modules.js              14 módulos de software y sus ganchos de eventos
+│   └── Modules.js              19 módulos de software (nuevos: Satélites, Minas de fase, Núcleo crítico, Imán, Onda de choque) y sus ganchos de eventos
 ├── utils/
 │   ├── DungeonGenerator.js     mapa procedural, clasificación de salas, distribución de obstáculos
 │   └── Pathfinding.js          A* (heap binario, sin cortar esquinas) + línea de visión (Bresenham)

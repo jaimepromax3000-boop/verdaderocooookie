@@ -31,7 +31,17 @@ class GameScene extends Phaser.Scene {
     this.doorSprites = [];
 
     this.cameras.main.setBackgroundColor(0x03040c);
+    this.bgGrid = this.add.tileSprite(0, 0, W, H, 'bg_grid').setOrigin(0).setDepth(-5).setAlpha(0.5);
     this.rt = this.add.renderTexture(OX, OY, RW * T, RH * T).setOrigin(0, 0).setDepth(0);
+    this.overGfx = this.add.graphics().setDepth(31);               // barras de vida y avisos láser
+    this.hazards = []; this.barrels = []; this.mines = []; this.hazT = 0; this.novaKills = 0;
+    if (this.renderer.type === Phaser.WEBGL && !/[?&]nofx/.test(location.search)) {   // brillo y viñeta (solo WebGL)
+      try {
+        const cam = this.cameras.main;
+        cam.postFX.addBloom(0xffffff, 1, 1, 1.1, 1.05, 4);
+        cam.postFX.addVignette(0.5, 0.5, 0.92, 0.3);
+      } catch (e) { /* sin postFX */ }
+    }
     this.doorLayer = this.add.layer().setDepth(2);
     this.fxGfx = this.add.graphics().setDepth(30);
 
@@ -77,6 +87,9 @@ class GameScene extends Phaser.Scene {
   // ===================================================================================
   newFloor(n) {
     this.floor = n;
+    this.theme = THEMES[(n - 1) % THEMES.length];
+    this.cameras.main.setBackgroundColor(this.theme.bg);
+    this.bgGrid.setTint(this.theme.edge);
     const gen = new DungeonGenerator(this.seedBase + n * 977);
     this.dungeon = gen.generate(n);
     this.lockedDoors = {};
@@ -87,7 +100,7 @@ class GameScene extends Phaser.Scene {
       const nb = this.dungeon.get(tr.gx + d.dx, tr.gy + d.dy);
       if (nb) this.lockedDoors[DungeonGenerator.key(nb.gx, nb.gy) + ':' + d.opp] = true;
     }
-    Bus.emit('floor:new', { floor: n, dungeon: this.dungeon });
+    Bus.emit('floor:new', { floor: n, dungeon: this.dungeon, theme: this.theme });
     this.enterRoom(this.dungeon.start, null);
   }
 
@@ -123,6 +136,8 @@ class GameScene extends Phaser.Scene {
     this.sealed = this.enemies.some(e => !e.dead);
     this.rebuildBlocked();
     this.drawDoors();
+    this.buildExtras(room);
+    if (room.type === 'boss' && !room.cleared) Bus.emit('boss:intro', { name: BOSS_INFO[Math.min(3, this.floor)].name });
     Bus.emit('room:enter', { room });
   }
 
@@ -162,25 +177,47 @@ class GameScene extends Phaser.Scene {
         this.spawnEnemy('boss', c.x, c.y - 40);
         break;
       default: {
-        const n = Math.min(9, rng.int(3, 5) + (f - 1) + (room.dist > 3 ? 1 : 0));
-        for (let i = 0; i < n; i++) {
-          const roll = rng();
-          let type = 'grunt';
-          if (roll > 0.55) type = 'shooter';
-          if (roll > 0.85 && f >= 2) type = 'summoner';
-          const p = this.randomFreePoint(14, 150);
-          this.spawnEnemy(type, p.x, p.y);
-        }
+        const budget = 4 + f * 1.4 + room.dist * 0.35 + rng() * 2;
+        room.wavesTotal = budget > 7.5 ? 2 : 1;
+        room.wave = 1;
+        room.waveBudget = room.wavesTotal === 2 ? [budget * 0.55, budget * 0.5] : [budget];
+        this.spawnWave(room, 1);
       }
     }
   }
 
-  spawnEnemy(type, x, y, minion = false) {
+  /** Genera una oleada de la sala con un presupuesto de "coste" y una tabla de pesos por planta. */
+  spawnWave(room, wave) {
+    const f = this.floor, rng = this.rng;
+    const COST = { grunt: 1, shooter: 1, bomber: 0.8, splitter: 1.4, turret: 1.5, summoner: 2, sniper: 1.6, tank: 3, blinker: 1.6 };
+    const W = [
+      { grunt: 40, shooter: 30, bomber: 12, splitter: 10, turret: 8 },
+      { grunt: 22, shooter: 18, summoner: 10, sniper: 12, bomber: 10, splitter: 10, tank: 8, blinker: 10 },
+      { grunt: 12, shooter: 14, summoner: 10, sniper: 12, bomber: 10, splitter: 10, tank: 14, blinker: 12, turret: 6 },
+    ][Math.min(2, f - 1)];
+    const total = Object.values(W).reduce((a, b) => a + b, 0);
+    let budget = room.waveBudget[wave - 1], spent = 0, n = 0, eliteDone = wave > 1;
+    while (n < 10 && (spent < budget || n < 2)) {
+      let r = rng() * total, type = 'grunt';
+      for (const [k, w] of Object.entries(W)) { if ((r -= w) <= 0) { type = k; break; } }
+      if (spent + COST[type] > budget + 0.9 && n >= 2) break;
+      spent += COST[type]; n++;
+      const p = this.randomFreePoint(14, type === 'turret' ? 110 : 150);
+      let elite = null;
+      if (!eliteDone && room.dist >= 2 && ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker'].includes(type) && rng() < [0.1, 0.2, 0.3][Math.min(2, f - 1)]) {
+        elite = rng.pick(['fast', 'volatile', 'armored']); eliteDone = true;
+      }
+      this.spawnEnemy(type, p.x, p.y, false, elite);
+    }
+    if (wave > 1) Bus.emit('wave:start', { wave, total: room.wavesTotal });
+  }
+
+  spawnEnemy(type, x, y, minion = false, elite = null) {
     const f = this.floor;
     const scale = (type === 'boss' ? 1 + 0.4 * (f - 1) : 1 + 0.28 * (f - 1));
     let variant = null;
     if (type === 'shooter' && f >= 2) variant = this.rng() < 0.5 ? 'cryo' : (f >= 3 ? 'toxic' : null);
-    const e = new Enemy(this, x, y, type, scale, variant);
+    const e = new Enemy(this, x, y, type, scale, variant, elite);
     e.minion = minion;
     this.enemies.push(e);
     if (minion) this.spawnBurst(x, y, 0xffe94d, 6);
@@ -192,7 +229,19 @@ class GameScene extends Phaser.Scene {
     if (!this.room) return;
     // créditos sueltos con cierta probabilidad
     if (!e.minion && this.rng() < 0.4 + 0.1 * this.player.luck) this.addItem('coin', e.x, e.y, {});
-    if (this.sealed && !this.enemies.some(x => !x.dead)) this.clearRoom();
+    if (e.elite) {                                              // los élites sueltan botín extra
+      for (let i = 0; i < 3; i++) this.addItem('coin', e.x + (this.rng() - 0.5) * 40, e.y + (this.rng() - 0.5) * 40, {});
+      if (this.rng() < 0.4) this.addItem('heart', e.x, e.y, {});
+      else if (this.rng() < 0.3 && Modules.roll(this.rng, this.player, 1).length) this.addItem('module', e.x, e.y, { id: Modules.roll(this.rng, this.player, 1)[0] });
+      this.floatText(e.x, e.y - 24, 'ÉLITE ELIMINADO', ELITE_AFFIX[e.elite].color);
+    }
+    if (this.sealed && !this.enemies.some(x => !x.dead)) {
+      const room = this.room;
+      if (room.wavesTotal > 1 && room.wave < room.wavesTotal) {      // siguiente oleada
+        room.wave++;
+        this.time.delayedCall(900, () => { if (this.room === room && !this.runOver) this.spawnWave(room, room.wave); });
+      } else this.clearRoom();
+    }
   }
 
   clearRoom() {
@@ -203,6 +252,7 @@ class GameScene extends Phaser.Scene {
     this.rebuildBlocked();
     this.drawDoors();
     this.sfx('open');
+    this.clearHazards();
     const c = this.roomCenter();
     if (room.type === 'boss') {
       this.bossesKilled++;
@@ -210,6 +260,7 @@ class GameScene extends Phaser.Scene {
       if (id) this.addItem('module', c.x - 60, c.y, { id, group: 'bossreward' });
       this.addItem('portal', c.x + 60, c.y, {});
       this.floatText(c.x, c.y - 60, 'SERVIDOR PURGADO', 0x00f0ff);
+      this.cameras.main.flash(300, 0, 240, 255);
     } else {
       this.dropReward(c.x, c.y);
     }
@@ -248,14 +299,41 @@ class GameScene extends Phaser.Scene {
 
   drawRoom() {
     const { RW, RH, T } = CFG;
+    const th = this.theme, ti = THEMES.indexOf(th), room = this.room, L = room.layout;
+    const rng = makeRng((this.seedBase * 31 + room.gx * 97 + room.gy * 13 + this.floor) >>> 0);
     this.rt.clear();
     this.rt.beginDraw();
-    const L = this.room.layout;
     for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
       const v = L[y * RW + x];
-      this.rt.batchDraw(v === 1 ? 'tile_wall' : v === 2 ? 'tile_obs' : 'tile_floor', x * T, y * T);
+      if (v === 1) this.rt.batchDraw('tile_wall_' + ti, x * T, y * T);
+      else if (v === 2) this.rt.batchDraw('tile_obs_' + ti, x * T, y * T);
+      else { const r = rng(); this.rt.batchDraw('tile_floor_' + ti + '_' + (r < 0.6 ? 0 : r < 0.78 ? 1 : r < 0.9 ? 2 : 3), x * T, y * T); }
+    }
+    const cx = (RW * T) / 2, cy = (RH * T) / 2;                  // símbolo del suelo según el tipo de sala
+    const sig = { boss: 'sigil_boss', shop: 'sigil_shop', treasure: 'sigil_treasure', start: 'sigil_' + ti }[room.type];
+    if (sig) this.rt.batchDraw(sig, cx - 144, cy - 144, 0.9);
+    for (let i = 0; i < 16; i++) {                               // decoración: cables, grietas y nodos
+      const x = rng.int(1, RW - 2), y = rng.int(1, RH - 2);
+      if (L[y * RW + x] === 0) this.rt.batchDraw('decal_' + ti + '_' + rng.int(0, 3), x * T, y * T, 0.7);
     }
     this.rt.endDraw();
+    // resplandor de neón en el borde de paredes y obstáculos
+    const g = this.make.graphics({ add: false });
+    const at = (x, y) => (x < 0 || y < 0 || x >= RW || y >= RH) ? 1 : L[y * RW + x];
+    for (let y = 0; y < RH; y++) for (let x = 0; x < RW; x++) {
+      const v = L[y * RW + x];
+      if (!v) continue;
+      const col = v === 2 ? th.obsEdge : th.edge2;
+      for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]]) {
+        if (at(x + dx, y + dy)) continue;
+        const x0 = x * T + (dx === 1 ? T : 0), y0 = y * T + (dy === 1 ? T : 0);
+        const x1 = dx ? x0 : x0 + T, y1 = dy ? y0 : y0 + T;
+        g.lineStyle(7, col, 0.12); g.lineBetween(x0, y0, x1, y1);
+        g.lineStyle(2, col, 0.9); g.lineBetween(x0, y0, x1, y1);
+      }
+    }
+    this.rt.draw(g, 0, 0);
+    g.destroy();
   }
 
   drawDoors() {
@@ -331,6 +409,11 @@ class GameScene extends Phaser.Scene {
     this.bulletPool.releaseAll(b => { b.setActive(false).setVisible(false); });
     this.fires.forEach(f => f.sprite.destroy());
     this.fires = [];
+    this.mines.forEach(m => m.sprite.destroy());
+    this.mines = [];
+    this.clearHazards();
+    this.barrels.forEach(b => b.sprite.destroy());
+    this.barrels = [];
   }
 
   updateItems(dt) {
@@ -340,6 +423,10 @@ class GameScene extends Phaser.Scene {
       if (it.collected) continue;
       it.update(dt);
       const d = Math.hypot(it.x - p.x, it.baseY - p.y);
+      const mag = p.stack('magnet');
+      if (mag && it.auto && !(it.kind === 'heart' && p.hp >= p.maxHp) && d < 70 + 70 * mag && d > 1) {   // imán
+        it.x += (p.x - it.x) / d * 260 * dt; it.baseY += (p.y - it.baseY) / d * 260 * dt;
+      }
       if (it.auto && d < 24) { this.collect(it); continue; }
       if (!it.auto) {
         const near = d < 36;
@@ -397,22 +484,26 @@ class GameScene extends Phaser.Scene {
     return b;
   }
 
-  fireEnemyBullet(x, y, angle, speed, color, status) {
-    return this.fireBullet({ owner: 'enemy', damage: 1, speed, life: 3.2, pierce: 0, bounces: 0, size: 1, color, homing: 0, tags: [], status }, x, y, angle);
+  fireEnemyBullet(x, y, angle, speed, color, status, size = 1) {
+    return this.fireBullet({ owner: 'enemy', damage: 1, speed, life: 3.2, pierce: 0, bounces: 0, size, color, homing: 0, tags: [], status }, x, y, angle);
   }
 
   updateBullets(dt) {
     const p = this.player;
     this.bulletPool.forEach(b => {
       if (!b.step(dt)) { this.releaseBullet(b); return; }
+      for (const br of this.barrels) {                         // los barriles explosivos reciben balas de cualquiera
+        if ((br.x - b.x) ** 2 + (br.y - b.y) ** 2 < 17 * 17) { br.hp -= b.spec.damage; this.spark(b.x, b.y, 0xff9a3c, 1); if (br.hp <= 0) this.blowBarrel(br); this.releaseBullet(b); return; }
+      }
       if (b.owner === 'player') {
         for (const e of this.enemies) {
           if (e.dead || e.spawnT > 0 || b.hitSet.has(e)) continue;
           if ((e.x - b.x) ** 2 + (e.y - b.y) ** 2 > (e.radius + b.radius) ** 2) continue;
           b.hitSet.add(e);
-          let dmg = b.spec.damage;
+          let dmg = b.spec.damage, crit = false;
           if (e.hasStatus('slow') && b.spec.tags.includes('explosion')) dmg *= 1.5;
-          e.takeDamage(dmg, 'player', { color: b.spec.color });
+          if (b.spec.crit && this.rng() < b.spec.crit) { dmg *= 2; crit = true; this.floatText(e.x, e.y - e.radius - 20, '¡CRÍTICO!', 0xffe94d); this.spawnBurst(b.x, b.y, 0xffe94d, 6); }
+          e.takeDamage(dmg, 'player', { color: crit ? 0xffe94d : b.spec.color });
           e.knock(Math.atan2(b.vy, b.vx), 90);
           this.spark(b.x, b.y, b.spec.color, 1);
           Bus.emit('bullet:hit', { bullet: b, target: e });
@@ -475,6 +566,133 @@ class GameScene extends Phaser.Scene {
   }
 
   // ===================================================================================
+  //  Trampas, barriles, minas y ondas de choque
+  // ===================================================================================
+  tileOf(p) { return { x: Math.floor((p.x - CFG.OX) / CFG.T), y: Math.floor((p.y - CFG.OY) / CFG.T) }; }
+
+  /** Crea los pinchos y barriles de la sala (solo en salas de combate aún sin limpiar). */
+  buildExtras(room) {
+    const { T, OX, OY } = CFG;
+    this.hazards = []; this.barrels = [];
+    if (room.type !== 'combat') return;
+    if (!room.cleared) for (const h of room.hazards || []) {
+      const sprite = this.add.image(OX + h.tx * T + T / 2, OY + h.ty * T + T / 2, 'spike_off').setDepth(1);
+      this.hazards.push({ tx: h.tx, ty: h.ty, g: h.g, sprite, state: 'off' });
+    }
+    for (const b of room.barrels || []) {
+      const sprite = this.add.image(OX + b.tx * T + T / 2, OY + b.ty * T + T / 2, 'barrel').setDepth(8);
+      this.barrels.push({ x: sprite.x, y: sprite.y, hp: 2, sprite, src: b });
+    }
+  }
+
+  clearHazards() {
+    this.hazards.forEach(h => h.sprite.destroy());
+    this.hazards = [];
+  }
+
+  updateHazards(dt) {
+    if (!this.hazards.length) return;
+    this.hazT += dt;
+    const p = this.player, T = CFG.T;
+    for (const h of this.hazards) {
+      const ph = (this.hazT + h.g * 0.8) % 3.2;
+      const st = ph < 1.5 ? 'off' : ph < 2.2 ? 'warn' : ph < 2.9 ? 'on' : 'off';
+      if (st !== h.state) { h.state = st; h.sprite.setTexture('spike_' + st); }
+      if (st === 'warn') h.sprite.setAlpha(0.6 + 0.4 * Math.sin(this.time.now / 45));
+      else h.sprite.setAlpha(1);
+      if (st === 'on' && !p.dead && Math.abs(p.x - h.sprite.x) < T / 2 + p.radius - 4 && Math.abs(p.y - h.sprite.y) < T / 2 + p.radius - 4) {
+        if (p.takeDamage(1, 'spike')) this.spawnBurst(p.x, p.y, 0xff4466, 8);
+      }
+    }
+  }
+
+  blowBarrel(br) {
+    if (br.dead) return;
+    br.dead = true;
+    this.barrels = this.barrels.filter(b => b !== br);
+    if (this.room.barrels) this.room.barrels = this.room.barrels.filter(b => b !== br.src);
+    br.sprite.destroy();
+    this.ringFx(br.x, br.y, 80, 0xff9a3c);
+    this.spawnBurst(br.x, br.y, 0xff9a3c, 16);
+    this.sfx('boom'); this.cameras.main.shake(160, 0.006);
+    for (const e of this.enemies.slice()) if (!e.dead && e.spawnT <= 0 && (e.x - br.x) ** 2 + (e.y - br.y) ** 2 < (80 + e.radius) ** 2) e.takeDamage(4, 'player', { color: 0xff9a3c });
+    const p = this.player;
+    if (!p.dead && (p.x - br.x) ** 2 + (p.y - br.y) ** 2 < (80 + p.radius) ** 2) { if (p.takeDamage(1, 'barrel')) p.knock(Math.atan2(p.y - br.y, p.x - br.x), 300); }
+    for (const o of this.barrels.slice()) if ((o.x - br.x) ** 2 + (o.y - br.y) ** 2 < 90 * 90) this.time.delayedCall(120, () => this.blowBarrel(o));
+  }
+
+  spawnMine(x, y, damage) {
+    if (this.mines.length > 8) return;
+    const sprite = this.add.image(x, y, 'mine').setDepth(5).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.6);
+    this.mines.push({ x, y, damage, sprite, arm: 0.6, life: 14 });
+  }
+
+  updateMines(dt) {
+    for (const m of this.mines) {
+      m.arm -= dt; m.life -= dt;
+      m.sprite.setAlpha(m.arm > 0 ? 0.35 : 0.65 + 0.3 * Math.sin(this.time.now / 120));
+      if (m.arm > 0) continue;
+      if (this.enemies.some(e => !e.dead && e.spawnT <= 0 && (e.x - m.x) ** 2 + (e.y - m.y) ** 2 < (30 + e.radius) ** 2)) { m.life = 0; this.explode(m.x, m.y, 74, m.damage, 'player'); }
+    }
+    this.mines = this.mines.filter(m => { if (m.life <= 0) { m.sprite.destroy(); return false; } return true; });
+  }
+
+  /** Onda circular: daña (y opcionalmente aturde) a los enemigos y puede borrar balas enemigas. */
+  shockwave(x, y, r, dmg, stunT, color, clearBullets) {
+    this.ringFx(x, y, r, color);
+    this.ringFx(x, y, r * 0.65, color);
+    this.spawnBurst(x, y, color, 18);
+    for (const e of this.enemies.slice()) {
+      if (e.dead || e.spawnT > 0 || (e.x - x) ** 2 + (e.y - y) ** 2 > (r + e.radius) ** 2) continue;
+      e.takeDamage(dmg, 'player', { color });
+      if (stunT > 0 && !e.dead) e.addStatus('stun', stunT, 0);
+      if (!e.dead) e.knock(Math.atan2(e.y - y, e.x - x), 260);
+    }
+    if (clearBullets) this.bulletPool.forEach(b => { if (b.owner === 'enemy' && (b.x - x) ** 2 + (b.y - y) ** 2 < r * r) { this.spark(b.x, b.y, color, 1.2); this.releaseBullet(b); } });
+  }
+
+  /** Explosión enemiga (bombas, blindados, élites volátiles): daña al jugador. */
+  enemyExplosion(x, y, radius, dmg, color) {
+    this.ringFx(x, y, radius, color);
+    this.spawnBurst(x, y, color, 16);
+    this.sfx('boom'); this.cameras.main.shake(150, 0.006);
+    const p = this.player;
+    if (!p.dead && (p.x - x) ** 2 + (p.y - y) ** 2 < (radius + p.radius) ** 2) { if (p.takeDamage(dmg, 'explosion')) p.knock(Math.atan2(p.y - y, p.x - x), 320); }
+  }
+
+  ringFx(x, y, r, color) {
+    const ring = this.add.circle(x, y, 6, color, 0.12).setStrokeStyle(3, color, 1).setDepth(26).setBlendMode(Phaser.BlendModes.ADD);
+    this.tweens.add({ targets: ring, radius: r, alpha: 0, duration: 320, onComplete: () => ring.destroy() });
+  }
+
+  rayEnd(x, y, ang) {
+    const dx = Math.cos(ang) * 6, dy = Math.sin(ang) * 6;
+    let px = x, py = y;
+    for (let i = 0; i < 160; i++) { if (this.solidAt(px + dx, py + dy)) break; px += dx; py += dy; }
+    return { x: px, y: py };
+  }
+
+  /** Barras de vida de enemigos y avisos láser de los francotiradores. */
+  drawOver() {
+    const g = this.overGfx;
+    g.clear();
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (e.telegraph !== null && e.telegraph !== undefined) {
+        const end = this.rayEnd(e.x, e.y, e.telegraph);
+        const a = 0.35 + 0.35 * Math.sin(this.time.now / 40);
+        g.lineStyle(5, 0xb6ff3c, 0.12 + a * 0.2); g.lineBetween(e.x, e.y, end.x, end.y);
+        g.lineStyle(1.5, 0xe6ffb0, a + 0.3); g.lineBetween(e.x, e.y, end.x, end.y);
+      }
+      if (e.type === 'boss' || e.spawnT > 0) continue;
+      if (e.hp >= e.maxHp && !e.elite) continue;
+      const w = Math.max(24, e.radius * 2 + 8), x = e.x - w / 2, y = e.y - e.radius - 14;
+      g.fillStyle(0x000000, 0.7); g.fillRect(x - 1, y - 1, w + 2, 5);
+      g.fillStyle(e.elite ? ELITE_AFFIX[e.elite].color : 0xff4466, 1); g.fillRect(x, y, w * Math.max(0, e.hp / e.maxHp), 3);
+    }
+  }
+
+  // ===================================================================================
   //  Efectos visuales y sonido
   // ===================================================================================
   spark(x, y, color, life = 1) {
@@ -505,7 +723,7 @@ class GameScene extends Phaser.Scene {
 
   afterimage(spr) {
     if (this.rng() < 0.5) return;
-    const a = this.add.image(spr.x, spr.y, 'player').setTint(spr.baseTint).setRotation(spr.rotation).setAlpha(0.5).setDepth(15).setBlendMode(Phaser.BlendModes.ADD);
+    const a = this.add.image(spr.x, spr.y, spr.texture.key).setTint(spr.character ? spr.character.color : 0xffffff).setRotation(spr.rotation).setAlpha(0.5).setDepth(15).setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({ targets: a, alpha: 0, duration: 220, onComplete: () => a.destroy() });
   }
 
@@ -553,6 +771,10 @@ class GameScene extends Phaser.Scene {
     this.updateFires(dt);
     this.updateItems(dt);
     this.updateParticles(dt);
+    this.updateHazards(dt);
+    this.updateMines(dt);
+    this.drawOver();
+    this.bgGrid.tilePositionX += dt * 8; this.bgGrid.tilePositionY += dt * 5;
     this.contactDamage();
     this.checkDoors();
     Bus.emit('tick', { dt });

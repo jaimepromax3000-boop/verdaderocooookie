@@ -10,11 +10,21 @@ const CFG = {
   COL: { cyan: 0x00f0ff, magenta: 0xff2bd6, yellow: 0xffe94d, green: 0x5dff8a, red: 0xff4466, orange: 0xff9a3c, violet: 0x9b5cff, white: 0xffffff },
 };
 
-/** Personajes seleccionables en el menú. */
+/** Personajes seleccionables en el menú. Cada uno tiene una habilidad activa (tecla Q o clic derecho). */
 const CHARACTERS = [
-  { id: 'hacker', name: 'Hacker de Almas', desc: 'Equilibrado.', color: 0x00f0ff, hp: 6, shield: 1, speed: 1.0, damage: 1.0 },
-  { id: 'ghost',  name: 'Fantasma',         desc: 'Rápido y frágil.', color: 0xff2bd6, hp: 4, shield: 1, speed: 1.2, damage: 1.0 },
-  { id: 'daemon', name: 'Daemon',           desc: 'Resistente y lento.', color: 0xffe94d, hp: 8, shield: 0, speed: 0.88, damage: 1.1 },
+  { id: 'hacker', name: 'Hacker de Almas', desc: 'Equilibrado.', color: 0x00f0ff, ship: 'ship_hacker', hp: 6, shield: 1, speed: 1.0, damage: 1.0,
+    ability: { id: 'emp', name: 'Pulso EMP', cd: 9, desc: 'Borra balas y aturde a los enemigos cercanos.' } },
+  { id: 'ghost',  name: 'Fantasma',         desc: 'Rápido y frágil.', color: 0xff2bd6, ship: 'ship_ghost', hp: 4, shield: 1, speed: 1.2, damage: 1.0,
+    ability: { id: 'phase', name: 'Fase espectral', cd: 10, desc: '2,5 s intangible y rápido, con estela de fuego.' } },
+  { id: 'daemon', name: 'Daemon',           desc: 'Resistente y lento.', color: 0xffe94d, ship: 'ship_daemon', hp: 8, shield: 0, speed: 0.88, damage: 1.1,
+    ability: { id: 'swarm', name: 'Enjambre', cd: 12, desc: '3 satélites orbitan 8 s: dañan y bloquean balas.' } },
+];
+
+/** Biomas: uno por planta. Definen la paleta de suelos, paredes, obstáculos y fondo. */
+const THEMES = [
+  { name: 'SERVIDORES',    floor: 0x070b1a, grid: 0x12204a, dot: 0x0e1a3d, wall: 0x0b1030, edge: 0x2748ff, edge2: 0x00f0ff, obs: 0x1b0b2e, obsEdge: 0xff2bd6, bg: 0x03040c, accent: 0x00f0ff },
+  { name: 'RED NEURONAL',  floor: 0x0d0716, grid: 0x2a1250, dot: 0x24103f, wall: 0x1a0a30, edge: 0x9b5cff, edge2: 0xff2bd6, obs: 0x2a0a22, obsEdge: 0xffe94d, bg: 0x07030c, accent: 0xff2bd6 },
+  { name: 'NÚCLEO CENTRAL', floor: 0x140806, grid: 0x3a1608, dot: 0x2a1008, wall: 0x240c08, edge: 0xff9a3c, edge2: 0xff4466, obs: 0x1a0a0a, obsEdge: 0xffe94d, bg: 0x0a0302, accent: 0xff9a3c },
 ];
 
 /** Armas básicas que se eligen en la sala segura al empezar cada incursión. */
@@ -31,6 +41,7 @@ const UPGRADES = [
   { id: 'regen',   name: 'Autorreparación',    desc: 'El escudo se recarga antes', max: 2, cost: [30, 60],     req: 'shield',  pos: [0, 2] },
   { id: 'dmg',     name: 'Compilador agresivo', desc: '+10 % de daño',            max: 3, cost: [20, 40, 80],  req: null,      pos: [1, 0] },
   { id: 'dash',    name: 'Salto de fase',      desc: '-12 % enfriamiento del dash', max: 3, cost: [20, 40, 70], req: 'dmg',    pos: [1, 1] },
+  { id: 'ability', name: 'Núcleo recargable',  desc: '-12 % enfriamiento de la habilidad (Q)', max: 3, cost: [25, 50, 90], req: 'dash', pos: [1, 2] },
   { id: 'speed',   name: 'Overclock motor',    desc: '+6 % de velocidad',         max: 3, cost: [15, 35, 65],  req: null,      pos: [2, 0] },
   { id: 'credits', name: 'Fondos opacos',      desc: '+15 créditos iniciales',    max: 3, cost: [15, 30, 55],  req: 'speed',   pos: [2, 1] },
   { id: 'key',     name: 'Llave maestra',     desc: 'Empiezas con 1 llave',       max: 1, cost: [60],          req: 'credits', pos: [2, 2] },

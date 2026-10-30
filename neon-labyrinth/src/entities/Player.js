@@ -7,11 +7,14 @@
  */
 class Player extends Entity {
   constructor(scene, x, y, character, weaponId) {
-    super(scene, x, y, 'player', 11, 1);
+    super(scene, x, y, character.ship || 'ship_hacker', 11, 1);
     this.character = character;
-    this.baseTint = character.color;
-    this.setTint(this.baseTint);
+    this.baseTint = 0xffffff;                           // la nave ya trae sus colores
     this.setDepth(20);
+    this.glowImg = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(character.color).setAlpha(0.45).setScale(1.7).setDepth(19);
+    this.engineT = 0;
+    this.orbiters = [];                                 // satélites (habilidad del Daemon y módulo 'orbit')
+    this.phaseT = 0;                                    // fase espectral activa
 
     // --- estadísticas base + metaprogresión ---
     const m = id => Meta.level(id);
@@ -23,6 +26,10 @@ class Player extends Entity {
     this.moveSpeed = 185 * character.speed * (1 + 0.06 * m('speed'));
     this.damageMult = character.damage * (1 + 0.10 * m('dmg'));
     this.dashCooldown = 0.9 * (1 - 0.12 * m('dash'));
+    this.ability = character.ability;
+    this.abilityCooldown = this.ability.cd * (1 - 0.12 * m('ability'));
+    this.abilityCdT = this.abilityCooldown * 0.35;      // empieza algo cargada
+    this.prevRight = false;
     this.luck = m('luck');
     this.credits = 15 * m('credits');
     this.keys = m('key') ? 1 : 0;
@@ -44,9 +51,11 @@ class Player extends Entity {
 
     const kb = scene.input.keyboard;
     this.keys2 = kb.addKeys({
-      w: 'W', a: 'A', s: 'S', d: 'D', up: 'UP', left: 'LEFT', down: 'DOWN', right: 'RIGHT', space: 'SPACE', shift: 'SHIFT',
+      w: 'W', a: 'A', s: 'S', d: 'D', up: 'UP', left: 'LEFT', down: 'DOWN', right: 'RIGHT', space: 'SPACE', shift: 'SHIFT', q: 'Q',
     });
   }
+
+  destroy(fromScene) { if (this.glowImg) { this.glowImg.destroy(); this.glowImg = null; } super.destroy(fromScene); }
 
   stack(id) { return this.modules[id] || 0; }
 
@@ -114,6 +123,62 @@ class Player extends Entity {
     Bus.emit('player:dash', { player: this });
   }
 
+  // ---------- habilidad activa ----------
+  tryAbility() {
+    if (this.abilityCdT > 0 || this.dead || this.gs.inputLocked) return;
+    this.abilityCdT = this.abilityCooldown;
+    const g = this.gs;
+    switch (this.ability.id) {
+      case 'emp':
+        g.shockwave(this.x, this.y, 200, 2 * this.damageMult, 1.6, 0x00f0ff, true);
+        break;
+      case 'phase':
+        this.phaseT = 2.5; this.iframes = Math.max(this.iframes, 2.5);
+        this.addBuff('speed', 2.5, 1.5);
+        g.spawnBurst(this.x, this.y, 0xff2bd6, 16);
+        break;
+      case 'swarm':
+        for (let i = 0; i < 3; i++) this.addOrbiter(8);
+        g.spawnBurst(this.x, this.y, 0xffe94d, 14);
+        break;
+    }
+    g.sfx('module');
+    g.cameras.main.shake(120, 0.004);
+    Bus.emit('player:ability', { id: this.ability.id });
+  }
+
+  /** Añade un satélite; life = segundos (null = permanente, del módulo "Satélites"). */
+  addOrbiter(life) {
+    const sprite = this.gs.add.image(this.x, this.y, 'orbiter').setBlendMode(Phaser.BlendModes.ADD).setDepth(21);
+    this.orbiters.push({ sprite, life, hitCd: new Map() });
+  }
+
+  updateOrbiters(dt) {
+    const n = this.orbiters.length;
+    if (!n) return;
+    const g = this.gs, t = g.time.now / 1000;
+    this.orbiters.forEach((o, i) => {
+      if (o.life !== null) o.life -= dt;
+      const a = t * 4.2 + (i / n) * Math.PI * 2;
+      o.sprite.setPosition(this.x + Math.cos(a) * 50, this.y + Math.sin(a) * 50).setRotation(a * 2);
+      if (o.life !== null && o.life < 1.2) o.sprite.setAlpha(0.4 + 0.6 * Math.abs(Math.sin(t * 14)));
+      for (const e of g.enemies) {
+        if (e.dead || e.spawnT > 0) continue;
+        const cd = (o.hitCd.get(e) || 0) - dt; o.hitCd.set(e, cd);
+        if (cd <= 0 && (e.x - o.sprite.x) ** 2 + (e.y - o.sprite.y) ** 2 < (e.radius + 9) ** 2) {
+          o.hitCd.set(e, 0.45);
+          e.takeDamage(1.2 * this.damageMult, 'player', { color: 0x00f0ff });
+          e.knock(Math.atan2(e.y - this.y, e.x - this.x), 120);
+          g.spark(o.sprite.x, o.sprite.y, 0x00f0ff, 1.2);
+        }
+      }
+      g.bulletPool.forEach(b => {                       // bloquean balas enemigas
+        if (b.owner === 'enemy' && (b.x - o.sprite.x) ** 2 + (b.y - o.sprite.y) ** 2 < 14 * 14) { g.releaseBullet(b); g.spark(b.x, b.y, 0x00f0ff, 1); }
+      });
+    });
+    this.orbiters = this.orbiters.filter(o => { if (o.life !== null && o.life <= 0) { o.sprite.destroy(); return false; } return true; });
+  }
+
   update(dt) {
     if (this.dead) return;
     const k = this.keys2;
@@ -128,6 +193,9 @@ class Player extends Entity {
     this.setRotation(this.aimAngle + Math.PI / 2);
 
     if (Phaser.Input.Keyboard.JustDown(k.space) || Phaser.Input.Keyboard.JustDown(k.shift)) this.tryDash(dir.clone());
+    const right = p.rightButtonDown();
+    if (Phaser.Input.Keyboard.JustDown(k.q) || (right && !this.prevRight)) this.tryAbility();
+    this.prevRight = right;
 
     if (this.dashT > 0) {
       this.dashT -= dt;
@@ -140,6 +208,19 @@ class Player extends Entity {
     }
 
     this.dashCdT = Math.max(0, this.dashCdT - dt);
+    this.abilityCdT = Math.max(0, this.abilityCdT - dt);
+    if (this.phaseT > 0) {                               // fase espectral: estela de fuego de datos
+      this.phaseT -= dt;
+      this.fadeT = (this.fadeT || 0) - dt;
+      if (this.fadeT <= 0) { this.fadeT = 0.12; this.gs.spawnFire(this.x, this.y, this.baseDamage() * 0.6, 1.4, ['ability'], 0xff2bd6); }
+      this.gs.afterimage(this);
+    }
+    this.updateOrbiters(dt);
+    this.glowImg.setPosition(this.x, this.y).setAlpha(0.35 + 0.1 * Math.sin(this.gs.time.now / 180));
+    if ((dir.x || dir.y) && this.dashT <= 0) {           // chispas del motor
+      this.engineT -= dt;
+      if (this.engineT <= 0) { this.engineT = 0.045; this.gs.spark(this.x - Math.cos(this.aimAngle) * 10 + (Math.random() - 0.5) * 4, this.y - Math.sin(this.aimAngle) * 10 + (Math.random() - 0.5) * 4, this.character.color, 0.7); }
+    }
     this.iframes = Math.max(0, this.iframes - dt);
     this.fireT -= dt;
     if ((p.isDown && p.leftButtonDown() || this.gs.autoFire) && this.fireT <= 0 && !this.gs.inputLocked) this.shoot();
@@ -155,7 +236,7 @@ class Player extends Entity {
     this.updateStatuses(dt);
 
     // parpadeo mientras es invulnerable
-    this.setAlpha(this.iframes > 0 ? 0.45 + 0.35 * Math.sin(this.gs.time.now / 40) : 1);
+    this.setAlpha(this.phaseT > 0 ? 0.35 : this.iframes > 0 ? 0.45 + 0.35 * Math.sin(this.gs.time.now / 40) : 1);
   }
 
   takeDamage(amount, source, info) {
@@ -180,6 +261,9 @@ class Player extends Entity {
     if (this.dead) return;
     this.dead = true;
     this.setVisible(false);
+    this.glowImg.setVisible(false);
+    this.orbiters.forEach(o => o.sprite.destroy()); this.orbiters = [];
+    this.gs.spawnBurst(this.x, this.y, this.character.color, 30);
     Bus.emit('player:dead', {});
   }
 }

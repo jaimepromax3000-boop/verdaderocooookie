@@ -16,6 +16,17 @@ class Entity extends Phaser.GameObjects.Sprite {
     this.statuses = {};            // slow / poison ...: { time, duration, power }
     this.flash = 0;
     this.baseTint = 0xffffff;
+    this.shadow = scene.add.image(x, y + 5, 'shadow').setDepth(4).setAlpha(0.4).setScale(radius / 11);
+  }
+
+  preUpdate(t, d) {
+    super.preUpdate(t, d);
+    if (this.shadow) this.shadow.setPosition(this.x, this.y + this.radius * 0.5).setVisible(this.visible).setAlpha(0.4 * this.alpha);
+  }
+
+  destroy(fromScene) {
+    if (this.shadow) { this.shadow.destroy(); this.shadow = null; }
+    super.destroy(fromScene);
   }
 
   /** Mueve la entidad (dx,dy en píxeles) deslizándose contra paredes y obstáculos. */
@@ -49,6 +60,7 @@ class Entity extends Phaser.GameObjects.Sprite {
 
   /** Multiplicador de velocidad por estados (ralentización). */
   speedFactor() {
+    if (this.statuses.stun) return 0;
     const sl = this.statuses.slow;
     return sl ? sl.power : 1;
   }
@@ -74,6 +86,7 @@ class Entity extends Phaser.GameObjects.Sprite {
   }
 
   statusTint() {
+    if (this.statuses.stun) return 0xffe94d;
     if (this.statuses.poison) return 0x7dff9a;
     if (this.statuses.slow) return 0x9fe9ff;
     return this.baseTint;

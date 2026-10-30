@@ -20,23 +20,25 @@ class MenuScene extends Phaser.Scene {
     this.cards = [];
     CHARACTERS.forEach((c, i) => {
       const x = 40 + i * 152, y = 160;
-      const bg = this.add.rectangle(x, y, 142, 190, 0x0a1230).setOrigin(0).setStrokeStyle(2, 0x2748ff).setInteractive({ useHandCursor: true });
-      const ship = this.add.image(x + 71, y + 56, 'player').setTint(c.color).setScale(2);
+      const bg = this.add.rectangle(x, y, 142, 208, 0x0a1230).setOrigin(0).setStrokeStyle(2, 0x2748ff).setInteractive({ useHandCursor: true });
+      const ship = this.add.image(x + 71, y + 54, c.ship).setScale(1.9);
       this.add.text(x + 71, y + 104, c.name, { fontFamily: 'monospace', fontSize: '13px', color: '#ffffff', align: 'center', wordWrap: { width: 130 } }).setOrigin(0.5, 0);
-      this.add.text(x + 71, y + 140, `♥ ${c.hp + Meta.level('hp')}  ◈ ${c.shield + Meta.level('shield')}\n${c.desc}`, { fontFamily: 'monospace', fontSize: '11px', color: '#9fc4ff', align: 'center', wordWrap: { width: 130 } }).setOrigin(0.5, 0);
+      this.add.text(x + 71, y + 122, `♥ ${c.hp + Meta.level('hp')}  ◈ ${c.shield + Meta.level('shield')}  ·  ${c.desc}`, { fontFamily: 'monospace', fontSize: '10px', color: '#9fc4ff', align: 'center', wordWrap: { width: 130 } }).setOrigin(0.5, 0);
+      this.add.text(x + 71, y + 150, `Q · ${c.ability.name}`, { fontFamily: 'monospace', fontSize: '11px', color: '#' + c.color.toString(16).padStart(6, '0'), align: 'center', fontStyle: 'bold' }).setOrigin(0.5, 0);
+      this.add.text(x + 71, y + 165, c.ability.desc, { fontFamily: 'monospace', fontSize: '9px', color: '#7f95c9', align: 'center', wordWrap: { width: 132 } }).setOrigin(0.5, 0);
       bg.on('pointerdown', () => { this.selected = i; this.refreshCards(); });
       this.cards.push({ bg, ship, c });
     });
     this.refreshCards();
 
     // --- controles ---
-    this.add.text(40, 376, 'CONTROLES', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe94d' });
-    this.add.text(40, 402,
-      'WASD / flechas  mover\nRatón            apuntar y disparar (mantén pulsado)\nEspacio / Shift  dash con invulnerabilidad\nE                recoger, comprar, usar el portal\nESC              pausa\n\nLimpia cada sala para abrir sus puertas.\nLa sala con llave guarda un tesoro oculto.\nCombina módulos: ¡las sinergias son el truco!',
-      { fontFamily: 'monospace', fontSize: '13px', color: '#9fc4ff', lineSpacing: 3 });
+    this.add.text(40, 392, 'CONTROLES', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe94d' });
+    this.add.text(40, 414,
+      'WASD / flechas  mover      Ratón  apuntar y disparar\nEspacio / Shift  dash con invulnerabilidad\nQ / clic derecho habilidad del personaje\nE  recoger, comprar, portal    Tab  mapa    ESC  pausa\n\nLimpia cada sala (a veces en 2 oleadas) para abrir las puertas.\nCuidado con pinchos y barriles explosivos. ¡Combina módulos!',
+      { fontFamily: 'monospace', fontSize: '11px', color: '#9fc4ff', lineSpacing: 3 });
 
     // --- árbol de habilidades ---
-    this.add.text(520, 132, '2 · HABILIDADES PERMANENTES', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe94d' });
+    this.add.text(520, 132, '2 · MEJORAS PERMANENTES', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe94d' });
     this.fragText = this.add.text(990, 132, '', { fontFamily: 'monospace', fontSize: '16px', color: '#5dff8a' }).setOrigin(1, 0);
     this.nodes = [];
     this.tip = this.add.text(520, 520, '', { fontFamily: 'monospace', fontSize: '13px', color: '#cffcff', wordWrap: { width: 470 } });
@@ -58,7 +60,7 @@ class MenuScene extends Phaser.Scene {
     this.add.text(W / 2 + 120, 596, 'INICIAR INCURSIÓN  [Enter]', { fontFamily: 'monospace', fontSize: '20px', color: '#00f0ff', fontStyle: 'bold' }).setOrigin(0.5);
     start.on('pointerdown', () => this.startRun());
     this.input.keyboard.on('keydown-ENTER', () => this.startRun());
-    this.add.text(40, 610, `Mejor planta: ${Meta.data.bestFloor}   Salas limpiadas (récord): ${Meta.data.bestRooms}   Victorias: ${Meta.data.wins}`, { fontFamily: 'monospace', fontSize: '12px', color: '#6f86c9' });
+    this.add.text(40, 618, `Mejor planta: ${Meta.data.bestFloor}   Salas limpiadas (récord): ${Meta.data.bestRooms}   Victorias: ${Meta.data.wins}`, { fontFamily: 'monospace', fontSize: '12px', color: '#6f86c9' });
     const reset = this.add.text(500, 618, '[borrar progreso]', { fontFamily: 'monospace', fontSize: '11px', color: '#6a3a46' }).setInteractive({ useHandCursor: true });
     reset.on('pointerdown', () => { if (reset.confirm) { Meta.reset(); this.scene.restart(); } else { reset.confirm = true; reset.setText('[¿seguro? pulsa otra vez]').setColor('#ff4466'); } });
   }

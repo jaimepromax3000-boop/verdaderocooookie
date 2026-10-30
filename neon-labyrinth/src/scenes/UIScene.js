@@ -30,8 +30,13 @@ class UIScene extends Phaser.Scene {
     this.gMods = this.add.graphics();
     this.modLabels = [];
     this.gDash = this.add.graphics();
+    this.gAbility = this.add.graphics();
+    this.abilityText = this.add.text(CFG.W - 20, CFG.H - 50, '', { fontFamily: 'monospace', fontSize: '11px', color: '#cffcff', align: 'right' }).setOrigin(1, 0);
+    this.gBig = this.add.graphics().setDepth(40);
+    this.bigLabels = [];
+    this.keyTab = this.input.keyboard.addKey('TAB');
     this.gBoss = this.add.graphics();
-    this.bossText = this.add.text(W / 2, H - 40, '', { fontFamily: 'monospace', fontSize: '12px', color: '#ff2bd6' }).setOrigin(0.5);
+    this.bossText = this.add.text(W / 2, H - 42, '', { fontFamily: 'monospace', fontSize: '12px', color: '#ff2bd6' }).setOrigin(0.5);
 
     this.overlay = null;
     this.sig = '';
@@ -41,10 +46,15 @@ class UIScene extends Phaser.Scene {
       Bus.on('game:pause', e => this.showPause(e.paused)),
       Bus.on('run:end', e => this.showEnd(e)),
       Bus.on('room:clear', () => this.banner('SALA LIMPIA')),
-      Bus.on('boss:phase', () => this.banner('¡EL GUARDIÁN SE ENFURECE!')),
+      Bus.on('boss:phase', e => this.banner(`¡${(e.name || 'EL JEFE').toUpperCase()} SE ENFURECE!`, '#ff2bd6')),
+      Bus.on('boss:intro', e => this.banner('JEFE · ' + e.name.toUpperCase(), '#ff2bd6')),
+      Bus.on('wave:start', e => this.banner(`OLEADA ${e.wave}/${e.total}`, '#ffe94d')),
+      Bus.on('floor:new', e => this.banner(`PLANTA ${e.floor} · ${e.theme.name}`, '#' + e.theme.accent.toString(16).padStart(6, '0'))),
+      Bus.on('player:ability', e => this.banner({ emp: 'PULSO EMP', phase: 'FASE ESPECTRAL', swarm: 'ENJAMBRE' }[e.id] || '', '#00f0ff', 70)),
     ];
     this.events.once('shutdown', () => this.offs.forEach(f => f()));
     this.redFlash = this.add.rectangle(0, 0, W, H, 0xff0033, 0).setOrigin(0).setDepth(50);
+    if (this.gs.theme) this.banner(`PLANTA ${this.gs.floor} · ${this.gs.theme.name}`, '#' + this.gs.theme.accent.toString(16).padStart(6, '0'));
   }
 
   // ---------- efectos ----------
@@ -60,9 +70,10 @@ class UIScene extends Phaser.Scene {
     this.tweens.add({ targets: this.redFlash, alpha: 0, duration: 380 });
   }
 
-  banner(text) {
-    const t = this.add.text(CFG.W / 2, 110, text, { fontFamily: 'monospace', fontSize: '26px', color: '#00f0ff', stroke: '#000', strokeThickness: 4, fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0);
-    this.tweens.add({ targets: t, alpha: 1, y: 100, duration: 250, yoyo: true, hold: 900, onComplete: () => t.destroy() });
+  banner(text, color = '#00f0ff', y = 110) {
+    if (!text) return;
+    const t = this.add.text(CFG.W / 2, y, text, { fontFamily: 'monospace', fontSize: y < 100 ? '18px' : '26px', color, stroke: '#000', strokeThickness: 4, fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0).setDepth(45);
+    this.tweens.add({ targets: t, alpha: 1, y: y - 10, duration: 250, yoyo: true, hold: 900, onComplete: () => t.destroy() });
   }
 
   // ---------- dibujo del HUD (cada fotograma, barato: solo formas) ----------
@@ -75,7 +86,10 @@ class UIScene extends Phaser.Scene {
     this.drawMap(g);
     this.drawMods(p);
     this.drawDash(p);
+    this.drawAbility(p);
     this.drawBoss(g);
+    this.drawBigMap(g);
+    this.lowHp(p);
     this.txtInfo.setText(`¢ ${p.credits}    🔑 ${p.keys}`.replace('🔑', 'LLAVES'));
     this.txtInfo2.setText(`Salas limpiadas: ${g.roomsCleared}   ·   Fragmentos al morir: +${g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12}`);
     this.txtFloor.setText(`PLANTA ${g.floor}/${CFG.FLOORS}  ·  ${this.roomName(g.room)}`);
@@ -133,35 +147,94 @@ class UIScene extends Phaser.Scene {
     }
   }
 
-  drawMap(game) {
-    const g = this.gMap;
-    g.clear();
-    const d = game.dungeon;
-    const cell = 15, gap = 3, ox = CFG.W - 7 * (cell + gap) - 12, oy = 70;
-    g.fillStyle(0x03050f, 0.55); g.fillRect(ox - 6, oy - 6, 7 * (cell + gap) + 6, 7 * (cell + gap) + 6);
+  /** Dibuja un mapa de salas en (ox,oy) con celdas de tamaño `cell` (reutilizado por el minimapa y el mapa grande). */
+  paintMap(g, game, ox, oy, cell, gap, big) {
+    const d = game.dungeon, step = cell + gap, pulse = 0.5 + 0.5 * Math.sin(this.time.now / 220);
+    const cur = game.room;
     for (const r of d.list) {
       if (!r.discovered && !r.visited) continue;
       if (r.type === 'treasure' && !r.visited) continue;           // el tesoro está oculto hasta entrar
-      const x = ox + r.gx * (cell + gap), y = oy + r.gy * (cell + gap);
-      for (const [name, dd] of Object.entries(DIRS)) {           // conexiones
+      const x = ox + r.gx * step, y = oy + r.gy * step;
+      for (const [name, dd] of Object.entries(DIRS)) {           // conexiones (puertas)
         if (!r.doors[name]) continue;
         const o = d.get(r.gx + dd.dx, r.gy + dd.dy);
-        if (o && (o.visited || r.visited)) { g.lineStyle(2, 0x2748ff, 1); g.lineBetween(x + cell / 2, y + cell / 2, x + cell / 2 + dd.dx * (cell + gap) / 2, y + cell / 2 + dd.dy * (cell + gap) / 2); }
+        if (!o || !(o.visited || r.visited)) continue;
+        if (o.type === 'treasure' && !o.visited) continue;
+        g.lineStyle(big ? 4 : 2, (r.visited && o.visited) ? 0x2f56ff : 0x1a2a66, 1);
+        g.lineBetween(x + cell / 2, y + cell / 2, x + cell / 2 + dd.dx * step / 2, y + cell / 2 + dd.dy * step / 2);
       }
-      const visited = r.visited;
-      let col = visited ? 0x2748ff : 0x16204a;
-      if (r.type === 'shop') col = 0xffe94d;
-      else if (r.type === 'boss') col = 0xff2bd6;
-      else if (r.type === 'treasure') col = 0x5dff8a;
-      g.fillStyle(col, visited || r.type !== 'combat' ? 0.9 : 0.5); g.fillRect(x, y, cell, cell);
-      g.lineStyle(1, 0x00f0ff, visited ? 0.9 : 0.3); g.strokeRect(x, y, cell, cell);
-      if (r.type === 'boss') { g.fillStyle(0x000000, 1); g.fillRect(x + 4, y + 4, 3, 3); g.fillRect(x + 9, y + 4, 3, 3); g.fillRect(x + 5, y + 10, 6, 2); }   // calavera
-      if (r.type === 'shop') { g.fillStyle(0x000000, 1); g.fillRect(x + 6, y + 3, 3, 9); g.fillRect(x + 4, y + 5, 7, 2); }                                      // $
-      if (r.type === 'treasure') { g.fillStyle(0x000000, 1); g.fillRect(x + 4, y + 6, 8, 5); }                                                                   // cofre
     }
-    const cur = game.room;
-    const cx = ox + cur.gx * (cell + gap) + cell / 2, cy = oy + cur.gy * (cell + gap) + cell / 2;
-    g.fillStyle(0xffffff, 1); g.fillCircle(cx, cy, 3.2);
+    for (const r of d.list) {
+      if (!r.discovered && !r.visited) continue;
+      if (r.type === 'treasure' && !r.visited) continue;
+      const x = ox + r.gx * step, y = oy + r.gy * step, visited = r.visited, k = cell / 15;
+      let col = visited ? 0x2748ff : 0x16204a;
+      if (r.type === 'shop') col = 0xffe94d; else if (r.type === 'boss') col = 0xff2bd6; else if (r.type === 'treasure') col = 0x5dff8a; else if (r.type === 'start') col = 0x00b4c8;
+      if (visited && r.type === 'combat' && r.cleared) col = 0x1c3a8a;
+      g.fillStyle(col, visited || r.type !== 'combat' ? 0.92 : 0.5); g.fillRect(x, y, cell, cell);
+      g.lineStyle(big ? 2 : 1, 0x00f0ff, visited ? 0.9 : 0.3); g.strokeRect(x, y, cell, cell);
+      g.fillStyle(0x000000, 1);
+      if (r.type === 'boss') { g.fillRect(x + 4 * k, y + 4 * k, 3 * k, 3 * k); g.fillRect(x + 9 * k, y + 4 * k, 3 * k, 3 * k); g.fillRect(x + 5 * k, y + 10 * k, 6 * k, 2 * k); }
+      else if (r.type === 'shop') { g.fillRect(x + 6 * k, y + 3 * k, 3 * k, 9 * k); g.fillRect(x + 4 * k, y + 5 * k, 7 * k, 2 * k); g.fillRect(x + 4 * k, y + 9 * k, 7 * k, 2 * k); }
+      else if (r.type === 'treasure') g.fillRect(x + 4 * k, y + 6 * k, 8 * k, 5 * k);
+      else if (r.type === 'start') { g.fillStyle(0xffffff, 0.9); g.fillTriangle(x + 7.5 * k, y + 3 * k, x + 12 * k, y + 11 * k, x + 3 * k, y + 11 * k); }
+      else if (visited && r.cleared) { g.fillStyle(0x7fa0ff, 0.9); g.fillRect(x + 6 * k, y + 6 * k, 3 * k, 3 * k); }
+      else if (!visited) { g.fillStyle(0x7fa0ff, 0.6); g.fillRect(x + 6 * k, y + 5 * k, 3 * k, 2 * k); g.fillRect(x + 6 * k, y + 9 * k, 3 * k, 2 * k); }   // "?"
+    }
+    const cx = ox + cur.gx * step + cell / 2, cy = oy + cur.gy * step + cell / 2;       // posición actual (pulsa)
+    g.lineStyle(2, 0xffffff, 0.4 + 0.5 * pulse); g.strokeRect(ox + cur.gx * step - 2, oy + cur.gy * step - 2, cell + 4, cell + 4);
+    g.fillStyle(0xffffff, 1); g.fillCircle(cx, cy, big ? 5 : 3.2);
+  }
+
+  drawMap(game) {
+    const g = this.gMap;
+    g.clear();
+    const cell = 15, gap = 3, ox = CFG.W - 7 * (cell + gap) - 12, oy = 70;
+    g.fillStyle(0x03050f, 0.6); g.fillRect(ox - 6, oy - 6, 7 * (cell + gap) + 6, 7 * (cell + gap) + 6);
+    g.lineStyle(1, 0x2748ff, 0.8); g.strokeRect(ox - 6, oy - 6, 7 * (cell + gap) + 6, 7 * (cell + gap) + 6);
+    this.paintMap(g, game, ox, oy, cell, gap, false);
+  }
+
+  /** Mapa grande de la planta (mantén Tab). */
+  drawBigMap(game) {
+    const g = this.gBig;
+    g.clear();
+    this.bigLabels.forEach(l => l.destroy()); this.bigLabels = [];
+    if (!this.keyTab.isDown || this.overlay) return;
+    const W = CFG.W, H = CFG.H, cell = 46, gap = 14, step = cell + gap, size = 7 * step;
+    const ox = (W - size) / 2 + 20, oy = 105;
+    g.fillStyle(0x02030a, 0.9); g.fillRect(0, 0, W, H);
+    g.lineStyle(2, game.theme.accent, 0.7); g.strokeRect(ox - 20, oy - 20, size + 20, size + 4);
+    this.paintMap(g, game, ox, oy, cell, gap, true);
+    const t = this.add.text(W / 2, 54, `PLANTA ${game.floor} · ${game.theme.name}`, { fontFamily: 'monospace', fontSize: '24px', color: '#00f0ff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(41);
+    const legend = [['#00b4c8', 'Inicio'], ['#2748ff', 'Combate'], ['#ffe94d', 'Tienda'], ['#5dff8a', 'Tesoro (llave)'], ['#ff2bd6', 'Jefe']];
+    legend.forEach(([c, n], i) => {
+      g.fillStyle(parseInt(c.slice(1), 16), 1); g.fillRect(40, 130 + i * 30, 16, 16);
+      this.bigLabels.push(this.add.text(64, 130 + i * 30, n, { fontFamily: 'monospace', fontSize: '14px', color: '#cffcff' }).setDepth(41));
+    });
+    this.bigLabels.push(t, this.add.text(W / 2, H - 28, 'Suelta Tab para volver', { fontFamily: 'monospace', fontSize: '12px', color: '#6f86c9' }).setOrigin(0.5).setDepth(41));
+  }
+
+  drawAbility(p) {
+    const g = this.gAbility;
+    g.clear();
+    const x = CFG.W - 38, y = CFG.H - 30, r = 17;
+    const frac = p.abilityCooldown > 0 ? 1 - p.abilityCdT / p.abilityCooldown : 1, ready = frac >= 1;
+    const col = p.character.color;
+    g.fillStyle(0x08122e, 0.95); g.fillCircle(x, y, r + 2);
+    g.lineStyle(4, ready ? col : 0x2748ff, 1); g.beginPath(); g.arc(x, y, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac, false); g.strokePath();
+    if (ready) { g.lineStyle(2, 0xffffff, 0.4 + 0.4 * Math.sin(this.time.now / 160)); g.strokeCircle(x, y, r + 5); }
+    g.fillStyle(ready ? col : 0x445080, 1);
+    const id = p.ability.id;
+    if (id === 'emp') { g.lineStyle(2, ready ? col : 0x445080, 1); g.strokeCircle(x, y, 4); g.strokeCircle(x, y, 9); g.fillCircle(x, y, 2); }
+    else if (id === 'phase') { g.fillTriangle(x, y - 8, x + 6, y + 7, x - 6, y + 7); g.fillStyle(0x08122e, 1); g.fillTriangle(x, y - 2, x + 2.5, y + 5, x - 2.5, y + 5); }
+    else { for (let i = 0; i < 3; i++) { const a = i * Math.PI * 2 / 3 - Math.PI / 2; g.fillCircle(x + Math.cos(a) * 7, y + Math.sin(a) * 7, 3); } }
+    this.abilityText.setText(`${p.ability.name}\n[Q] ${ready ? 'LISTA' : (p.abilityCdT).toFixed(1) + 's'}`).setColor(ready ? '#ffffff' : '#7f95c9').setPosition(x - 24, y - 12);
+  }
+
+  lowHp(p) {
+    const low = !p.dead && p.hp <= 1.5 && p.maxHp > 1;
+    if (low && !this.tweens.isTweening(this.redFlash)) this.redFlash.setAlpha(0.05 + 0.05 * (0.5 + 0.5 * Math.sin(this.time.now / 260)));
   }
 
   drawMods(p) {
@@ -194,12 +267,13 @@ class UIScene extends Phaser.Scene {
     const g = this.gBoss;
     g.clear();
     const boss = game.enemies.find(e => e.type === 'boss' && !e.dead);
-    this.bossText.setText(boss ? ENEMY_TYPES.boss.name : '');
+    this.bossText.setText(boss ? boss.bossInfo.name.toUpperCase() : '').setColor('#' + (boss ? boss.color : 0xff2bd6).toString(16).padStart(6, '0'));
     if (!boss) return;
     const w = 420, x = (CFG.W - w) / 2, y = CFG.H - 26;
     g.fillStyle(0x1a0830, 0.9); g.fillRect(x, y, w, 10);
-    g.fillStyle(0xff2bd6, 1); g.fillRect(x, y, w * Math.max(0, boss.hp / boss.maxHp), 10);
+    g.fillStyle(boss.color, 1); g.fillRect(x, y, w * Math.max(0, boss.hp / boss.maxHp), 10);
     g.lineStyle(2, 0xffffff, 0.8); g.strokeRect(x, y, w, 10);
+    g.lineStyle(2, 0xffffff, 0.9); for (let i = 1; i < boss.bossInfo.phases; i++) { const tx = x + w * (1 - i / boss.bossInfo.phases) + (boss.bossInfo.phases === 2 ? 0 : 0); g.lineBetween(tx, y - 2, tx, y + 12); }
   }
 
   // ---------- paneles ----------
