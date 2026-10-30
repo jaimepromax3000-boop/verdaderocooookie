@@ -260,7 +260,7 @@ class Enemy extends Entity {
         this.moveDir.set(Math.cos(this.aimAngle), Math.sin(this.aimAngle));
         if (t >= 0.95 && !this.attackStep) {
           this.attackStep = 1;
-          g.fireBullet({ owner: 'enemy', damage: 1, speed: 640, life: 1.6, pierce: 0, bounces: 0, size: 1.35, color: 0xb6ff3c, homing: 0, tags: [], status: null }, this.x, this.y, this.aimAngle);
+          g.fireBullet({ owner: 'enemy', damage: g.diff.dmg, speed: 640, life: 1.6, pierce: 0, bounces: 0, size: 1.35, color: 0xb6ff3c, homing: 0, tags: [], status: null }, this.x, this.y, this.aimAngle);
           g.sfx('shoot');
         }
         if (t > 1.3) { this.attackCd = 2.6 + g.rng() * 0.8; fsm.set('chase'); }

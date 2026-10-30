@@ -497,7 +497,7 @@ class GameScene extends Phaser.Scene {
   }
 
   fireEnemyBullet(x, y, angle, speed, color, status, size = 1) {
-    return this.fireBullet({ owner: 'enemy', damage: 1, speed, life: 3.2, pierce: 0, bounces: 0, size, color, homing: 0, tags: [], status }, x, y, angle);
+    return this.fireBullet({ owner: 'enemy', damage: this.diff.dmg, speed, life: 3.2, pierce: 0, bounces: 0, size, color, homing: 0, tags: [], status }, x, y, angle);
   }
 
   updateBullets(dt) {
@@ -734,7 +734,7 @@ class GameScene extends Phaser.Scene {
     this.spawnBurst(x, y, color, 16);
     this.sfx('boom'); this.cameras.main.shake(150, 0.006);
     const p = this.player;
-    if (!p.dead && (p.x - x) ** 2 + (p.y - y) ** 2 < (radius + p.radius) ** 2) { if (p.takeDamage(dmg, 'explosion')) p.knock(Math.atan2(p.y - y, p.x - x), 320); }
+    if (!p.dead && (p.x - x) ** 2 + (p.y - y) ** 2 < (radius + p.radius) ** 2) { if (p.takeDamage(dmg * this.diff.dmg, 'explosion')) p.knock(Math.atan2(p.y - y, p.x - x), 320); }
   }
 
   ringFx(x, y, r, color) {
@@ -865,7 +865,7 @@ class GameScene extends Phaser.Scene {
       if (e.dead || e.spawnT > 0 || !e.contact) continue;
       if (e.type === 'grunt' && !e.charging && e.fsm.name !== 'chase') continue;
       if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (e.radius + p.radius) ** 2) {
-        if (p.takeDamage(1, 'contact')) { p.knock(Math.atan2(p.y - e.y, p.x - e.x), 320); e.knock(Math.atan2(e.y - p.y, e.x - p.x), 120); }
+        if (p.takeDamage(this.diff.dmg, 'contact')) { p.knock(Math.atan2(p.y - e.y, p.x - e.x), 320); e.knock(Math.atan2(e.y - p.y, e.x - p.x), 120); }
       }
     }
   }

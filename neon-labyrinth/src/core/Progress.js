@@ -22,9 +22,9 @@ const RARITY_COLOR = { 'común': 0x9fc4ff, 'rara': 0x5dff8a, 'épica': 0xff2bd6,
 
 /** Dificultades: escalan a los enemigos y las recompensas. `chest` sube o baja la calidad del cofre del jefe. */
 const DIFFICULTIES = [
-  { id: 'easy',   name: 'FÁCIL',   color: 0x5dff8a, hp: 0.75, count: 0.8,  speed: 0.92, elite: 0.5, reward: 0.7, chest: -1, desc: 'Menos enemigos y más débiles. Recompensas x0,7.' },
-  { id: 'normal', name: 'NORMAL',  color: 0x00f0ff, hp: 1,    count: 1,    speed: 1,    elite: 1,   reward: 1,   chest: 0,  desc: 'La experiencia equilibrada. Recompensas x1.' },
-  { id: 'hard',   name: 'DIFÍCIL', color: 0xff4466, hp: 1.45, count: 1.3,  speed: 1.1,  elite: 2,   reward: 1.7, chest: 1,  desc: 'Más vida, más enemigos y más élites. Recompensas x1,7 y mejores cofres.' },
+  { id: 'easy',   name: 'FÁCIL',   color: 0x5dff8a, hp: 0.75, count: 0.8,  speed: 0.92, elite: 0.5, dmg: 1,   reward: 0.7, chest: -1, desc: 'Menos enemigos y más débiles. Recompensas x0,7.' },
+  { id: 'normal', name: 'NORMAL',  color: 0x00f0ff, hp: 1,    count: 1,    speed: 1,    elite: 1,   dmg: 1,   reward: 1,   chest: 0,  desc: 'La experiencia equilibrada. Recompensas x1.' },
+  { id: 'hard',   name: 'DIFÍCIL', color: 0xff4466, hp: 1.45, count: 1.3,  speed: 1.1,  elite: 2,   dmg: 1.5, reward: 1.7, chest: 1,  desc: 'Enemigos con +45 % de vida y +50 % de daño, más numerosos. Tu vida no cambia. Recompensas x1,7.' },
 ];
 
 const CHEST_TIERS = [
