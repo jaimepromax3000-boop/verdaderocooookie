@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neon Labyrinth</title>
+  <style>
+    html, body { margin: 0; height: 100%; background: #02030a; overflow: hidden; }
+    #game { width: 100vw; height: 100vh; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <!-- Punto de entrada y contenedor del Canvas. Funciona abriendo el archivo directamente (sin servidor). -->
+  <div id="game"></div>
+
+  <script src="lib/phaser.min.js"></script>
+
+  <!-- núcleo -->
+  <script src="src/core/Config.js"></script>
+  <script src="src/core/EventBus.js"></script>
+  <script src="src/core/StateMachine.js"></script>
+  <script src="src/core/ObjectPool.js"></script>
+  <script src="src/core/Modules.js"></script>
+  <!-- utilidades -->
+  <script src="src/utils/DungeonGenerator.js"></script>
+  <script src="src/utils/Pathfinding.js"></script>
+  <!-- entidades -->
+  <script src="src/entities/Entity.js"></script>
+  <script src="src/entities/Player.js"></script>
+  <script src="src/entities/Enemy.js"></script>
+  <script src="src/entities/Projectile.js"></script>
+  <script src="src/entities/Item.js"></script>
+  <!-- escenas -->
+  <script src="src/scenes/BootScene.js"></script>
+  <script src="src/scenes/MenuScene.js"></script>
+  <script src="src/scenes/GameScene.js"></script>
+  <script src="src/scenes/UIScene.js"></script>
+  <script src="src/main.js"></script>
+</body>
+</html>
