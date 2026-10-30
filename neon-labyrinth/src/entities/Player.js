@@ -6,8 +6,9 @@
  *  - Estadísticas modificables por metaprogresión, módulos de software y buffs temporales.
  */
 class Player extends Entity {
-  constructor(scene, x, y, character, weaponId) {
-    super(scene, x, y, character.ship || 'ship_hacker', 11, 1);
+  constructor(scene, x, y, character, weaponId, skinId = 'operator') {
+    super(scene, x, y, 'skin_' + skinId, 11, 1);
+    this.wpImg = scene.add.image(x, y, character.wp).setDepth(21);
     this.character = character;
     this.baseTint = 0xffffff;                           // la nave ya trae sus colores
     this.setDepth(20);
@@ -55,7 +56,11 @@ class Player extends Entity {
     });
   }
 
-  destroy(fromScene) { if (this.glowImg) { this.glowImg.destroy(); this.glowImg = null; } super.destroy(fromScene); }
+  destroy(fromScene) {
+    if (this.glowImg) { this.glowImg.destroy(); this.glowImg = null; }
+    if (this.wpImg) { this.wpImg.destroy(); this.wpImg = null; }
+    super.destroy(fromScene);
+  }
 
   stack(id) { return this.modules[id] || 0; }
 
@@ -103,12 +108,18 @@ class Player extends Entity {
   shoot() {
     const spec = this.shotSpec();
     const w = this.weapon;
-    for (let i = 0; i < w.pellets; i++) {
-      let a = this.aimAngle;
-      if (w.pellets > 1) a += (i / (w.pellets - 1) - 0.5) * w.spread + (this.gs.rng() - 0.5) * 0.08;
-      else a += (this.gs.rng() - 0.5) * w.spread;
-      this.gs.fireBullet(Object.assign({}, spec, { tags: spec.tags.slice() }), this.x + Math.cos(a) * 14, this.y + Math.sin(a) * 14, a);
+    const lines = spec.multi || 1;                           // doble / triple disparo (mejora "Cadencia de fuego")
+    for (let l = 0; l < lines; l++) {
+      const off = (l - (lines - 1) / 2) * 9;                 // líneas paralelas separadas lateralmente
+      for (let i = 0; i < w.pellets; i++) {
+        let a = this.aimAngle;
+        if (w.pellets > 1) a += (i / (w.pellets - 1) - 0.5) * w.spread + (this.gs.rng() - 0.5) * 0.08;
+        else a += (this.gs.rng() - 0.5) * w.spread;
+        const px = this.x + Math.cos(this.aimAngle) * 16 - Math.sin(this.aimAngle) * off, py = this.y + Math.sin(this.aimAngle) * 16 + Math.cos(this.aimAngle) * off;
+        this.gs.fireBullet(Object.assign({}, spec, { tags: spec.tags.slice() }), px, py, a);
+      }
     }
+    this.gs.spawnBurst(this.x + Math.cos(this.aimAngle) * 20, this.y + Math.sin(this.aimAngle) * 20, this.character.color, 2);
     this.fireT = 1 / (w.rate * spec.rateMult);
     this.gs.sfx('shoot');
   }
@@ -138,7 +149,7 @@ class Player extends Entity {
         g.spawnBurst(this.x, this.y, 0xff2bd6, 16);
         break;
       case 'swarm':
-        for (let i = 0; i < 3; i++) this.addOrbiter(8);
+        for (let i = 0; i < 3; i++) this.addOrbiter(8, 'sat');
         g.spawnBurst(this.x, this.y, 0xffe94d, 14);
         break;
     }
@@ -147,35 +158,45 @@ class Player extends Entity {
     Bus.emit('player:ability', { id: this.ability.id });
   }
 
-  /** Añade un satélite; life = segundos (null = permanente, del módulo "Satélites"). */
-  addOrbiter(life) {
-    const sprite = this.gs.add.image(this.x, this.y, 'orbiter').setBlendMode(Phaser.BlendModes.ADD).setDepth(21);
-    this.orbiters.push({ sprite, life, hitCd: new Map() });
+  /** Añade un orbital: 'sat' (satélite que daña) o 'shield' (escudo orbital que bloquea balas y se regenera). */
+  addOrbiter(life, kind = 'sat') {
+    const sprite = this.gs.add.image(this.x, this.y, kind === 'shield' ? 'orbshield' : 'orbiter').setBlendMode(Phaser.BlendModes.ADD).setDepth(21);
+    this.orbiters.push({ sprite, life, kind, hitCd: new Map(), broken: 0 });
   }
 
   updateOrbiters(dt) {
-    const n = this.orbiters.length;
-    if (!n) return;
     const g = this.gs, t = g.time.now / 1000;
-    this.orbiters.forEach((o, i) => {
-      if (o.life !== null) o.life -= dt;
-      const a = t * 4.2 + (i / n) * Math.PI * 2;
-      o.sprite.setPosition(this.x + Math.cos(a) * 50, this.y + Math.sin(a) * 50).setRotation(a * 2);
-      if (o.life !== null && o.life < 1.2) o.sprite.setAlpha(0.4 + 0.6 * Math.abs(Math.sin(t * 14)));
-      for (const e of g.enemies) {
-        if (e.dead || e.spawnT > 0) continue;
-        const cd = (o.hitCd.get(e) || 0) - dt; o.hitCd.set(e, cd);
-        if (cd <= 0 && (e.x - o.sprite.x) ** 2 + (e.y - o.sprite.y) ** 2 < (e.radius + 9) ** 2) {
-          o.hitCd.set(e, 0.45);
-          e.takeDamage(1.2 * this.damageMult, 'player', { color: 0x00f0ff });
-          e.knock(Math.atan2(e.y - this.y, e.x - this.x), 120);
-          g.spark(o.sprite.x, o.sprite.y, 0x00f0ff, 1.2);
+    for (const kind of ['sat', 'shield']) {
+      const list = this.orbiters.filter(o => o.kind === kind), n = list.length;
+      list.forEach((o, i) => {
+        if (o.life !== null) o.life -= dt;
+        const sh = kind === 'shield', rad = sh ? 34 : 52, a = sh ? -t * 2.6 + (i / n) * Math.PI * 2 : t * 4.2 + (i / n) * Math.PI * 2;
+        o.sprite.setPosition(this.x + Math.cos(a) * rad, this.y + Math.sin(a) * rad).setRotation(a * (sh ? 1 : 2) + (sh ? Math.PI / 2 : 0));
+        if (o.broken > 0) {                                  // escudo roto: se regenera
+          o.broken -= dt; o.sprite.setAlpha(0.12);
+          if (o.broken <= 0) { o.sprite.setAlpha(1); g.spark(o.sprite.x, o.sprite.y, 0x5dff8a, 1.5); }
+          return;
         }
-      }
-      g.bulletPool.forEach(b => {                       // bloquean balas enemigas
-        if (b.owner === 'enemy' && (b.x - o.sprite.x) ** 2 + (b.y - o.sprite.y) ** 2 < 14 * 14) { g.releaseBullet(b); g.spark(b.x, b.y, 0x00f0ff, 1); }
+        if (o.life !== null && o.life < 1.2) o.sprite.setAlpha(0.4 + 0.6 * Math.abs(Math.sin(t * 14)));
+        if (!sh) for (const e of g.enemies) {
+          if (e.dead || e.spawnT > 0) continue;
+          const cd = (o.hitCd.get(e) || 0) - dt; o.hitCd.set(e, cd);
+          if (cd <= 0 && (e.x - o.sprite.x) ** 2 + (e.y - o.sprite.y) ** 2 < (e.radius + 9) ** 2) {
+            o.hitCd.set(e, 0.45);
+            e.takeDamage(1.2 * this.damageMult, 'player', { color: 0x00f0ff });
+            e.knock(Math.atan2(e.y - this.y, e.x - this.x), 120);
+            g.spark(o.sprite.x, o.sprite.y, 0x00f0ff, 1.2);
+          }
+        }
+        g.bulletPool.forEach(b => {                           // bloquean balas enemigas
+          if (b.owner !== 'enemy' || o.broken > 0) return;
+          if ((b.x - o.sprite.x) ** 2 + (b.y - o.sprite.y) ** 2 < (sh ? 16 : 14) ** 2) {
+            g.releaseBullet(b); g.spark(b.x, b.y, sh ? 0x5dff8a : 0x00f0ff, 1.2);
+            if (sh) { o.broken = 10; g.spawnBurst(o.sprite.x, o.sprite.y, 0x5dff8a, 6); }   // el escudo absorbe 1 impacto
+          }
+        });
       });
-    });
+    }
     this.orbiters = this.orbiters.filter(o => { if (o.life !== null && o.life <= 0) { o.sprite.destroy(); return false; } return true; });
   }
 
@@ -217,6 +238,7 @@ class Player extends Entity {
     }
     this.updateOrbiters(dt);
     this.glowImg.setPosition(this.x, this.y).setAlpha(0.35 + 0.1 * Math.sin(this.gs.time.now / 180));
+    this.wpImg.setPosition(this.x + Math.cos(this.aimAngle) * 15, this.y + Math.sin(this.aimAngle) * 15).setRotation(this.aimAngle + Math.PI / 2);
     if ((dir.x || dir.y) && this.dashT <= 0) {           // chispas del motor
       this.engineT -= dt;
       if (this.engineT <= 0) { this.engineT = 0.045; this.gs.spark(this.x - Math.cos(this.aimAngle) * 10 + (Math.random() - 0.5) * 4, this.y - Math.sin(this.aimAngle) * 10 + (Math.random() - 0.5) * 4, this.character.color, 0.7); }
@@ -236,11 +258,16 @@ class Player extends Entity {
     this.updateStatuses(dt);
 
     // parpadeo mientras es invulnerable
-    this.setAlpha(this.phaseT > 0 ? 0.35 : this.iframes > 0 ? 0.45 + 0.35 * Math.sin(this.gs.time.now / 40) : 1);
+    const al = this.phaseT > 0 ? 0.35 : this.iframes > 0 ? 0.45 + 0.35 * Math.sin(this.gs.time.now / 40) : 1;
+    this.setAlpha(al); this.wpImg.setAlpha(al);
   }
 
   takeDamage(amount, source, info) {
     if (this.dead || this.iframes > 0) return false;
+    const dodge = this.stack('dodge');
+    if (dodge && !(info && info.silent) && this.gs.rng() < 0.08 * dodge) {   // esquiva: ignora el golpe
+      this.iframes = 0.35; this.gs.floatText(this.x, this.y - 22, 'ESQUIVA', 0x5dff8a); return false;
+    }
     if (info && info.silent) {                      // veneno: no usa escudo ni invulnerabilidad
       this.hp -= amount;
       if (this.hp <= 0) this.die(source);
@@ -252,7 +279,7 @@ class Player extends Entity {
     let left = amount;
     if (this.shield > 0) { const s = Math.min(this.shield, Math.ceil(left)); this.shield -= s; left -= s; }
     if (left > 0) this.hp -= left;
-    Bus.emit('player:hit', { damage: amount, crit: amount >= 2 || this.hp <= 1 });
+    Bus.emit('player:hit', { damage: amount, crit: amount >= 2 || this.hp <= 1, source });
     if (this.hp <= 0) this.die(source);
     return true;
   }
@@ -261,7 +288,7 @@ class Player extends Entity {
     if (this.dead) return;
     this.dead = true;
     this.setVisible(false);
-    this.glowImg.setVisible(false);
+    this.glowImg.setVisible(false); this.wpImg.setVisible(false);
     this.orbiters.forEach(o => o.sprite.destroy()); this.orbiters = [];
     this.gs.spawnBurst(this.x, this.y, this.character.color, 30);
     Bus.emit('player:dead', {});

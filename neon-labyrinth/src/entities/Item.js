@@ -5,7 +5,7 @@
  */
 class Item extends Phaser.GameObjects.Sprite {
   constructor(scene, x, y, kind, data = {}) {
-    super(scene, x, y, Item.textureFor(kind));
+    super(scene, x, y, kind === 'chest' ? 'chest_' + (data.tier || 1) : Item.textureFor(kind));
     scene.add.existing(this);
     this.gs = scene;
     this.kind = kind;                 // coin | heart | key | module | weapon | portal
@@ -19,8 +19,9 @@ class Item extends Phaser.GameObjects.Sprite {
     const tint = Item.tintFor(kind, data);
     if (tint !== null) this.setTint(tint);
     if (kind === 'module' || kind === 'weapon' || kind === 'portal') this.setScale(1.2);
-    if (kind === 'module' || kind === 'weapon' || this.price) {
-      const name = kind === 'module' ? Modules.defs[data.id].name : kind === 'weapon' ? WEAPONS[data.id].name : kind === 'heart' ? 'Reparación' : kind === 'key' ? 'Llave' : '';
+    if (kind === 'chest') this.setScale(1.3);
+    if (kind === 'module' || kind === 'weapon' || kind === 'chest' || this.price) {
+      const name = kind === 'chest' ? `Cofre de ${CHEST_TIERS[(data.tier || 1) - 1].name}\n[E] abrir` : kind === 'module' ? Modules.defs[data.id].name : kind === 'weapon' ? WEAPONS[data.id].name : kind === 'heart' ? 'Reparación' : kind === 'key' ? 'Llave' : '';
       this.label = scene.add.text(x, y + 24, (name + (this.price ? '\n' + this.price + '¢' : '')).trim(), {
         fontFamily: 'monospace', fontSize: '12px', color: '#cffcff', stroke: '#001018', strokeThickness: 3, align: 'center',
       }).setOrigin(0.5).setDepth(6);

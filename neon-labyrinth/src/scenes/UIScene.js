@@ -50,9 +50,16 @@ class UIScene extends Phaser.Scene {
       Bus.on('boss:intro', e => this.banner('JEFE · ' + e.name.toUpperCase(), '#ff2bd6')),
       Bus.on('wave:start', e => this.banner(`OLEADA ${e.wave}/${e.total}`, '#ffe94d')),
       Bus.on('floor:new', e => this.banner(`PLANTA ${e.floor} · ${e.theme.name}`, '#' + e.theme.accent.toString(16).padStart(6, '0'))),
+      Bus.on('upgrade:offer', e => this.showCards(e.cards)),
+      Bus.on('chest:open', e => this.showChest(e)),
+      Bus.on('mission:done', e => this.banner('MISIÓN COMPLETADA · ' + e.mission.text, '#5dff8a', 150)),
       Bus.on('player:ability', e => this.banner({ emp: 'PULSO EMP', phase: 'FASE ESPECTRAL', swarm: 'ENJAMBRE' }[e.id] || '', '#00f0ff', 70)),
     ];
     this.events.once('shutdown', () => this.offs.forEach(f => f()));
+    this.cardsUI = null; this.chestUI = null;
+    ['ONE', 'TWO', 'THREE'].forEach((k, i) => this.input.keyboard.on('keydown-' + k, () => { if (this.cardsUI && this.cardsUI.cards[i]) this.choose(this.cardsUI.cards[i].id); }));
+    this.input.keyboard.on('keydown-ENTER', () => this.closeChestUI());
+    this.input.keyboard.on('keydown-SPACE', () => this.closeChestUI());
     this.redFlash = this.add.rectangle(0, 0, W, H, 0xff0033, 0).setOrigin(0).setDepth(50);
     if (this.gs.theme) this.banner(`PLANTA ${this.gs.floor} · ${this.gs.theme.name}`, '#' + this.gs.theme.accent.toString(16).padStart(6, '0'));
   }
@@ -91,9 +98,9 @@ class UIScene extends Phaser.Scene {
     this.drawBigMap(g);
     this.lowHp(p);
     this.txtInfo.setText(`¢ ${p.credits}    🔑 ${p.keys}`.replace('🔑', 'LLAVES'));
-    this.txtInfo2.setText(`Salas limpiadas: ${g.roomsCleared}   ·   Fragmentos al morir: +${g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12}`);
+    this.txtInfo2.setText(`Salas: ${g.roomsCleared}  ·  Mejoras: ${g.upgradesPicked}  ·  Fragmentos al morir: +${Math.round((g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12) * g.diff.reward)}`);
     this.txtFloor.setText(`PLANTA ${g.floor}/${CFG.FLOORS}  ·  ${this.roomName(g.room)}`);
-    this.txtWeapon.setText(`Arma: ${p.weapon.name}   ·   ${p.character.name}`);
+    this.txtWeapon.setText(`${Meta.data.name}  ·  ${p.weapon.name}  ·  ${g.diff.name}`);
   }
 
   roomName(r) {
@@ -276,6 +283,79 @@ class UIScene extends Phaser.Scene {
     g.lineStyle(2, 0xffffff, 0.9); for (let i = 1; i < boss.bossInfo.phases; i++) { const tx = x + w * (1 - i / boss.bossInfo.phases) + (boss.bossInfo.phases === 2 ? 0 : 0); g.lineBetween(tx, y - 2, tx, y + 12); }
   }
 
+  // ---------- elegir mejora (1 de 3) ----------
+  showCards(cards) {
+    if (this.cardsUI) return;
+    const W = CFG.W, H = CFG.H, cw = 262, gap = 28, x0 = (W - (cw * 3 + gap * 2)) / 2, y0 = 150, ch = 340;
+    const c = this.add.container(0, 0).setDepth(80);
+    c.add(this.add.rectangle(0, 0, W, H, 0x02030a, 0.82).setOrigin(0));
+    c.add(this.add.text(W / 2, 78, 'SALA LIMPIA', { fontFamily: 'monospace', fontSize: '15px', color: '#6f86c9' }).setOrigin(0.5));
+    c.add(this.add.text(W / 2, 108, 'ELIGE UNA MEJORA', { fontFamily: 'monospace', fontSize: '32px', color: '#00f0ff', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+    cards.forEach((cd, i) => {
+      const x = x0 + i * (cw + gap), col = cd.color, hex = '#' + col.toString(16).padStart(6, '0');
+      const card = this.add.container(x, y0);
+      const bg = this.add.rectangle(0, 0, cw, ch, 0x0a1230, 0.96).setOrigin(0).setStrokeStyle(3, col).setInteractive({ useHandCursor: true });
+      const ring = this.add.graphics();
+      ring.fillStyle(col, 0.18); ring.fillCircle(cw / 2, 78, 44); ring.lineStyle(3, col, 1); ring.strokeCircle(cw / 2, 78, 44);
+      const letter = this.add.text(cw / 2, 78, cd.letter, { fontFamily: 'monospace', fontSize: '44px', color: hex, fontStyle: 'bold' }).setOrigin(0.5);
+      const name = this.add.text(cw / 2, 148, cd.name, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', fontStyle: 'bold', align: 'center', wordWrap: { width: cw - 24 } }).setOrigin(0.5, 0);
+      const pips = this.add.graphics();
+      for (let k = 0; k < cd.max; k++) { pips.fillStyle(k < cd.level ? col : 0x1a2450, 1); pips.fillRect(cw / 2 - cd.max * 9 + k * 18, 196, 14, 6); }
+      const lvl = this.add.text(cw / 2, 208, cd.level === 1 ? 'NUEVA' : `NIVEL ${cd.level}/${cd.max}`, { fontFamily: 'monospace', fontSize: '12px', color: hex }).setOrigin(0.5, 0);
+      const desc = this.add.text(cw / 2, 238, cd.desc, { fontFamily: 'monospace', fontSize: '14px', color: '#cffcff', align: 'center', wordWrap: { width: cw - 36 } }).setOrigin(0.5, 0);
+      const key = this.add.text(cw / 2, ch - 22, `[${i + 1}]`, { fontFamily: 'monospace', fontSize: '14px', color: '#6f86c9' }).setOrigin(0.5);
+      bg.on('pointerover', () => { bg.setFillStyle(0x14234f, 1); this.tweens.add({ targets: card, y: y0 - 8, duration: 120 }); });
+      bg.on('pointerout', () => { bg.setFillStyle(0x0a1230, 0.96); this.tweens.add({ targets: card, y: y0, duration: 120 }); });
+      bg.on('pointerdown', () => this.choose(cd.id));
+      card.add([bg, ring, letter, name, pips, lvl, desc, key]);
+      card.setAlpha(0).setScale(0.92);
+      this.tweens.add({ targets: card, alpha: 1, scale: 1, duration: 220, delay: 90 * i });
+      c.add(card);
+    });
+    this.cardsUI = { c, cards };
+  }
+
+  choose(id) {
+    if (!this.cardsUI) return;
+    this.cardsUI.c.destroy();
+    this.cardsUI = null;
+    this.gs.pickUpgrade(id);
+  }
+
+  // ---------- cofre de jefe ----------
+  showChest(e) {
+    if (this.chestUI) return;
+    const W = CFG.W, H = CFG.H, tier = CHEST_TIERS[e.tier - 1], hex = '#' + tier.color.toString(16).padStart(6, '0');
+    const c = this.add.container(0, 0).setDepth(85);
+    c.add(this.add.rectangle(0, 0, W, H, 0x02030a, 0.86).setOrigin(0));
+    c.add(this.add.text(W / 2, 70, `COFRE DE ${tier.name.toUpperCase()}`, { fontFamily: 'monospace', fontSize: '34px', color: hex, fontStyle: 'bold', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5));
+    const img = this.add.image(W / 2, 168, 'chest_' + e.tier).setScale(2.8);
+    c.add(img);
+    this.tweens.add({ targets: img, scale: 3.2, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    const rows = [];
+    e.items.forEach((it, i) => {
+      const y = 258 + i * 50, col = it.kind === 'skin' ? RARITY_COLOR[(SKINS.find(s => s.id === it.id) || {}).rarity] || 0xffffff : it.kind === 'upgrade' ? 0x5dff8a : it.kind === 'frag' ? 0x00f0ff : 0xffe94d;
+      const row = this.add.container(W / 2, y).setAlpha(0);
+      row.add(this.add.rectangle(0, 0, 560, 40, 0x0a1230, 0.95).setStrokeStyle(2, col));
+      if (it.kind === 'skin') row.add(this.add.image(-250, 0, 'skin_' + it.id).setScale(0.8));
+      else row.add(this.add.text(-250, 0, { coins: '¢', frag: '◆', upgrade: '▲' }[it.kind] || '?', { fontFamily: 'monospace', fontSize: '22px', color: '#' + col.toString(16).padStart(6, '0'), fontStyle: 'bold' }).setOrigin(0.5));
+      row.add(this.add.text(-215, 0, it.label, { fontFamily: 'monospace', fontSize: '17px', color: '#ffffff' }).setOrigin(0, 0.5));
+      c.add(row); rows.push(row);
+      this.tweens.add({ targets: row, alpha: 1, x: { from: W / 2 + 40, to: W / 2 }, duration: 260, delay: 500 + i * 380 });
+    });
+    const hint = this.add.text(W / 2, H - 50, '[Enter / clic]  Continuar', { fontFamily: 'monospace', fontSize: '20px', color: '#00f0ff', backgroundColor: '#0a1230', padding: { x: 18, y: 8 } }).setOrigin(0.5).setAlpha(0).setInteractive({ useHandCursor: true });
+    this.tweens.add({ targets: hint, alpha: 1, duration: 300, delay: 600 + e.items.length * 380 });
+    hint.on('pointerdown', () => this.closeChestUI());
+    c.add(hint);
+    this.chestUI = { c, t0: this.time.now, ready: 600 + e.items.length * 380 };
+  }
+
+  closeChestUI() {
+    if (!this.chestUI || this.time.now - this.chestUI.t0 < this.chestUI.ready) return;
+    this.chestUI.c.destroy(); this.chestUI = null;
+    this.gs.closeChest();
+  }
+
   // ---------- paneles ----------
   showPause(paused) {
     if (paused && !this.pauseTxt) {
@@ -286,13 +366,14 @@ class UIScene extends Phaser.Scene {
   showEnd(e) {
     if (this.overlay) return;
     const W = CFG.W, H = CFG.H;
-    const c = this.add.container(0, 0).setDepth(70);
-    c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.72).setOrigin(0));
-    c.add(this.add.text(W / 2, 170, e.win ? 'SERVIDOR CONQUISTADO' : 'CONEXIÓN PERDIDA', { fontFamily: 'monospace', fontSize: '44px', color: e.win ? '#5dff8a' : '#ff4466', fontStyle: 'bold', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5));
-    c.add(this.add.text(W / 2, 270,
-      `Planta alcanzada: ${e.floor}/${CFG.FLOORS}\nSalas limpiadas: ${e.rooms}\n\nFragmentos de Núcleo ganados: +${e.fragments}\nTotal: ${Meta.data.fragments}\n\nPierdes las mejoras de esta partida,\npero conservas los fragmentos.`,
+    const c = this.add.container(0, 0).setDepth(90);
+    c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.78).setOrigin(0));
+    c.add(this.add.text(W / 2, 120, e.win ? 'SERVIDOR CONQUISTADO' : 'CONEXIÓN PERDIDA', { fontFamily: 'monospace', fontSize: '44px', color: e.win ? '#5dff8a' : '#ff4466', fontStyle: 'bold', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5));
+    c.add(this.add.text(W / 2, 168, `${Meta.data.name}  ·  dificultad ${e.diff}`, { fontFamily: 'monospace', fontSize: '16px', color: '#9fc4ff' }).setOrigin(0.5));
+    c.add(this.add.text(W / 2, 215,
+      `Planta alcanzada: ${e.floor}/${CFG.FLOORS}\nSalas limpiadas: ${e.rooms}\nEnemigos eliminados: ${e.kills}\n\nFragmentos de Núcleo: +${e.fragments}   (total ${Meta.data.fragments})\nMonedas: +${e.coins}   (total ${Meta.data.coins})\n\nPierdes las mejoras de esta partida;\nconservas fragmentos, monedas y misiones.`,
       { fontFamily: 'monospace', fontSize: '20px', color: '#cffcff', align: 'center', lineSpacing: 4 }).setOrigin(0.5, 0));
-    const btn = this.add.text(W / 2, 520, '[ Enter ]  Volver al menú', { fontFamily: 'monospace', fontSize: '24px', color: '#00f0ff', backgroundColor: '#0a1230', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    const btn = this.add.text(W / 2, 560, '[ Enter ]  Volver al menú', { fontFamily: 'monospace', fontSize: '24px', color: '#00f0ff', backgroundColor: '#0a1230', padding: { x: 20, y: 10 } }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     c.add(btn);
     const back = () => { this.scene.stop('GameScene'); this.scene.start('MenuScene'); };
     btn.on('pointerdown', back);

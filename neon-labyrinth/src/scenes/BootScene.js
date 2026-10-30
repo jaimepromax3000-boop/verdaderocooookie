@@ -48,6 +48,8 @@ class BootScene extends Phaser.Scene {
 
   makeTextures() {
     this.makeShips();
+    this.makeSkins();
+    this.makeWeapons();
     this.makeEnemies();
     this.makeProps();
     this.makeTiles();
@@ -87,6 +89,133 @@ class BootScene extends Phaser.Scene {
       g.fillStyle(0xff9a3c, 1); g.fillCircle(22, 23, 4); g.fillStyle(0xffffff, 1); g.fillCircle(22, 23, 1.8);
     });
     this.tex('player', 40, 40, g => { this.poly(g, [[20, 3], [35, 33], [20, 27], [5, 33]], 0xffffff, 0xffffff, 2, 0.3); });
+  }
+
+
+  // ---------------------------------------------------------------------------------------
+  /** Skins: vistas desde arriba, mirando hacia arriba (el jugador las gira hacia el ratón). Solo cosméticas. */
+  makeSkins() {
+    const W = 0xffffff, ell = (g, x, y, w, h, fill, stroke, a = 1) => { g.fillStyle(fill, a); g.fillEllipse(x, y, w, h); if (stroke !== null) { g.lineStyle(1.5, stroke, 1); g.strokeEllipse(x, y, w, h); } };
+    const sk = (id, draw) => this.tex('skin_' + id, 40, 40, g => { g.fillStyle(0x000000, 0); this.glow(g, 20, 20, 20, (SKINS.find(s => s.id === id) || { color: W }).color, 0.05); draw(g); });
+    const robot = (g, metal, dark, eye, trim) => {
+      g.fillStyle(dark, 1); g.fillRect(7, 22, 26, 11); g.lineStyle(2, trim, 1); g.strokeRect(7, 22, 26, 11);
+      g.fillStyle(metal, 1); g.fillRect(12, 8, 16, 16); g.lineStyle(2, trim, 1); g.strokeRect(12, 8, 16, 16);
+      g.fillStyle(eye, 1); g.fillRect(15, 13, 10, 4); g.fillStyle(W, 0.9); g.fillRect(17, 14, 3, 2);
+      g.lineStyle(2, trim, 1); g.lineBetween(20, 8, 20, 3); g.fillStyle(eye, 1); g.fillCircle(20, 3, 2);
+    };
+    sk('operator', g => {
+      ell(g, 20, 28, 28, 13, 0x0a1a2e, 0x00f0ff);
+      ell(g, 20, 19, 18, 18, 0x14243a, 0x00f0ff);
+      g.fillStyle(0x00f0ff, 1); g.fillRect(13, 11, 14, 3.5); g.fillStyle(W, 0.8); g.fillRect(15, 12, 4, 1.5);
+      g.fillStyle(0x00f0ff, 1); g.fillCircle(10.5, 19, 3); g.fillCircle(29.5, 19, 3);
+      g.lineStyle(2, 0x00f0ff, 1); g.beginPath(); g.arc(20, 19, 10.5, Math.PI * 1.05, Math.PI * 1.95); g.strokePath();
+    });
+    sk('virus', g => {
+      for (let i = 0; i < 10; i++) { const a = i * Math.PI / 5; g.lineStyle(3, 0x9b5cff, 1); g.lineBetween(20 + 9 * Math.cos(a), 21 + 9 * Math.sin(a), 20 + 15 * Math.cos(a), 21 + 15 * Math.sin(a)); g.fillStyle(0xff2bd6, 1); g.fillCircle(20 + 16 * Math.cos(a), 21 + 16 * Math.sin(a), 2.6); }
+      g.fillStyle(0x2a0f4a, 1); g.fillCircle(20, 21, 10); g.lineStyle(2, 0x9b5cff, 1); g.strokeCircle(20, 21, 10);
+      g.fillStyle(W, 1); g.fillCircle(20, 17, 4.5); g.fillStyle(0xff2bd6, 1); g.fillCircle(20, 16, 2.4);
+      g.fillStyle(0x9b5cff, 0.8); g.fillCircle(14, 25, 2); g.fillCircle(26, 25, 2);
+    });
+    sk('pirate', g => {
+      ell(g, 20, 29, 30, 12, 0x1a3a6a, 0xffd23c);
+      g.fillStyle(0xffd23c, 1); g.fillCircle(14, 29, 1.4); g.fillCircle(20, 31, 1.4); g.fillCircle(26, 29, 1.4);
+      ell(g, 20, 20, 17, 17, 0xf2c9a0, null);
+      g.fillStyle(0xcc2233, 1); g.fillRect(11, 19, 18, 4);                     // pañuelo
+      g.fillStyle(0x15151f, 1); g.lineStyle(2, 0x555577, 1);
+      g.beginPath(); g.moveTo(20, 2); g.lineTo(35, 15); g.lineTo(28, 19); g.lineTo(20, 15); g.lineTo(12, 19); g.lineTo(5, 15); g.closePath(); g.fillPath(); g.strokePath();   // tricornio
+      g.fillStyle(W, 1); g.fillCircle(20, 11, 2.2); g.fillRect(19, 13, 2, 2);
+    });
+    sk('viking', g => {
+      ell(g, 20, 30, 24, 10, 0x6a4a2a, 0x3a2a14);
+      ell(g, 20, 28, 15, 12, 0xd08a3a, 0x8a5a1a);                              // barba
+      g.fillStyle(0xf2ead6, 1); g.lineStyle(1.5, 0x998866, 1);
+      g.beginPath(); g.moveTo(11, 17); g.lineTo(2, 12); g.lineTo(3, 6); g.lineTo(8, 11); g.lineTo(13, 13); g.closePath(); g.fillPath(); g.strokePath();   // cuernos
+      g.beginPath(); g.moveTo(29, 17); g.lineTo(38, 12); g.lineTo(37, 6); g.lineTo(32, 11); g.lineTo(27, 13); g.closePath(); g.fillPath(); g.strokePath();
+      ell(g, 20, 19, 17, 17, 0x7d8696, 0xc0c8d8);                               // yelmo
+      g.fillStyle(0xc0c8d8, 1); g.fillRect(18.5, 11, 3, 8);
+      g.fillStyle(0xf2c9a0, 1); g.fillRect(14, 22, 12, 3);
+    });
+    sk('robot', g => robot(g, 0xc0c8d8, 0x4a5368, 0xff2244, 0x00f0ff));
+    sk('ninja', g => {
+      ell(g, 20, 29, 28, 11, 0x14141c, 0x666680);
+      g.fillStyle(0xaa1122, 1); g.fillTriangle(12, 22, 7, 33, 14, 26); g.fillTriangle(28, 22, 33, 33, 26, 26);   // colas de la banda
+      ell(g, 20, 19, 18, 18, 0x14141c, 0x666680);
+      g.fillStyle(0xf2c9a0, 1); g.fillRect(13, 14, 14, 4);
+      g.fillStyle(0x14141c, 1); g.fillRect(16, 15, 3, 2); g.fillRect(21, 15, 3, 2);
+      g.fillStyle(0xaa1122, 1); g.fillRect(11, 10, 18, 3.5); g.fillStyle(0xdddddd, 1); g.fillRect(18, 10.5, 4, 2.5);
+    });
+    sk('astronaut', g => {
+      g.fillStyle(0x8890a8, 1); g.fillRect(11, 27, 18, 9); g.lineStyle(1.5, 0xc0c8d8, 1); g.strokeRect(11, 27, 18, 9);
+      ell(g, 20, 27, 28, 12, 0xeef2fa, 0xaab4cc);
+      ell(g, 20, 19, 20, 20, 0xf7f9ff, 0xaab4cc);
+      ell(g, 20, 16.5, 14, 9, 0xff9a3c, 0xffe94d); g.fillStyle(W, 0.55); g.fillEllipse(17, 14.5, 5, 3);
+      g.fillStyle(0xcc2233, 1); g.fillRect(12, 28, 4, 2);
+    });
+    sk('alien', g => {
+      ell(g, 20, 30, 18, 9, 0x2f8a4a, 0x5dff8a);
+      ell(g, 20, 18, 24, 20, 0x5dff8a, 0x2fd06a);
+      g.fillStyle(0x03120a, 1); g.fillEllipse(14, 14, 7, 11); g.fillEllipse(26, 14, 7, 11);
+      g.fillStyle(W, 0.8); g.fillCircle(13, 12, 1.2); g.fillCircle(25, 12, 1.2);
+      g.lineStyle(1.5, 0x2fd06a, 1); g.lineBetween(14, 8, 10, 3); g.lineBetween(26, 8, 30, 3); g.fillStyle(0xffe94d, 1); g.fillCircle(10, 3, 1.8); g.fillCircle(30, 3, 1.8);
+    });
+    sk('skull', g => {
+      g.lineStyle(2.5, 0xe8e8f0, 1); for (let i = 0; i < 3; i++) g.strokeEllipse(20, 28 + i * 2, 28 - i * 5, 9);
+      ell(g, 20, 19, 19, 19, 0xf2f2f8, 0xaaaabb);
+      g.fillStyle(0x0a0a12, 1); g.fillEllipse(15, 17, 6, 7); g.fillEllipse(25, 17, 6, 7); g.fillTriangle(20, 21, 18, 25, 22, 25);
+      g.fillStyle(0xff2244, 1); g.fillCircle(15, 17, 1.2); g.fillCircle(25, 17, 1.2);
+      g.lineStyle(1.5, 0x0a0a12, 1); for (const x of [16, 20, 24]) g.lineBetween(x, 26, x, 28.5);
+    });
+    sk('samurai', g => {
+      ell(g, 20, 29, 32, 12, 0xaa2233, 0xffd23c);
+      g.lineStyle(1.5, 0xffd23c, 1); g.lineBetween(10, 26, 10, 33); g.lineBetween(30, 26, 30, 33);
+      ell(g, 20, 20, 17, 17, 0xf2c9a0, null);
+      ell(g, 20, 16, 22, 17, 0x1a1a24, 0xffd23c);                                // kabuto
+      g.lineStyle(2.5, 0xffd23c, 1); g.beginPath(); g.arc(20, 10, 9, Math.PI * 1.15, Math.PI * 1.85); g.strokePath();   // cresta
+      g.fillStyle(0xffd23c, 1); g.fillTriangle(20, 3, 17, 9, 23, 9);
+      g.fillStyle(0xaa2233, 1); g.fillRect(14, 22, 12, 4);
+    });
+    sk('wizard', g => {
+      ell(g, 20, 30, 28, 11, 0x4a2a8a, 0x9b5cff);
+      ell(g, 20, 29, 11, 12, 0xf0f0ff, 0xaaaacc);                                // barba
+      ell(g, 20, 17, 30, 28, 0x6a3acb, 0xc9a6ff);                                // ala del sombrero
+      ell(g, 20, 17, 16, 15, 0x4a2a8a, 0x9b5cff);
+      g.fillStyle(0xffd23c, 1); g.fillPoints(this.ngon(20, 17, 4.5, 5, -Math.PI / 2).flatMap((p, i, a) => [{ x: p[0], y: p[1] }, { x: 20 + 2 * Math.cos(-Math.PI / 2 + (i + 0.5) * 2 * Math.PI / 5), y: 17 + 2 * Math.sin(-Math.PI / 2 + (i + 0.5) * 2 * Math.PI / 5) }]), true);
+    });
+    sk('golden', g => robot(g, 0xffd23c, 0xb8860b, 0x00f0ff, 0xfff2a8));
+  }
+
+  /** Cañones de las armas (el jugador los lleva delante, rotando con el apuntado). */
+  makeWeapons() {
+    const W = 0xffffff;
+    this.tex('wp_hacker', 20, 30, g => {      // pistola de pulso
+      this.glow(g, 10, 15, 12, 0x00f0ff, 0.05);
+      g.fillStyle(0x0a2a44, 1); g.lineStyle(2, 0x00f0ff, 1); g.fillRect(6, 8, 8, 20); g.strokeRect(6, 8, 8, 20);
+      g.fillStyle(0x00f0ff, 1); g.fillRect(8.5, 1, 3, 9); g.fillStyle(W, 1); g.fillCircle(10, 2, 1.6);
+      g.fillStyle(0x00f0ff, 0.6); g.fillRect(8, 14, 4, 8);
+    });
+    this.tex('wp_ghost', 20, 34, g => {       // arma ligera y alargada
+      this.glow(g, 10, 17, 12, 0xff2bd6, 0.05);
+      g.fillStyle(0x2a0a3a, 1); g.lineStyle(2, 0xff2bd6, 1); g.fillRect(8, 6, 4, 26); g.strokeRect(8, 6, 4, 26);
+      g.fillStyle(0xff2bd6, 1); g.fillTriangle(10, 0, 8, 7, 12, 7);
+      g.fillTriangle(4, 22, 8, 14, 8, 24); g.fillTriangle(16, 22, 12, 14, 12, 24);
+      g.fillStyle(W, 1); g.fillCircle(10, 2, 1.4);
+    });
+    this.tex('wp_daemon', 28, 30, g => {      // cañón pesado de doble boca
+      this.glow(g, 14, 15, 14, 0xffe94d, 0.05);
+      g.fillStyle(0x2a2208, 1); g.lineStyle(2, 0xffe94d, 1); g.fillRect(5, 10, 18, 18); g.strokeRect(5, 10, 18, 18);
+      g.fillRect(7, 1, 5, 11); g.strokeRect(7, 1, 5, 11); g.fillRect(16, 1, 5, 11); g.strokeRect(16, 1, 5, 11);
+      g.fillStyle(0xff9a3c, 1); g.fillRect(11, 16, 6, 8); g.fillStyle(W, 1); g.fillCircle(9.5, 2, 1.3); g.fillCircle(18.5, 2, 1.3);
+    });
+    // cofres de jefe (bronce / plata / oro)
+    [0xcd7f32, 0xc0c8d8, 0xffd23c].forEach((col, i) => this.tex('chest_' + (i + 1), 44, 38, g => {
+      this.glow(g, 22, 19, 22, col, 0.1);
+      g.fillStyle(0x1a1208, 1); g.lineStyle(3, col, 1);
+      g.fillRoundedRect(5, 12, 34, 22, 3); g.strokeRoundedRect(5, 12, 34, 22, 3);
+      g.fillRoundedRect(5, 5, 34, 12, 5); g.strokeRoundedRect(5, 5, 34, 12, 5);
+      g.lineStyle(2, col, 1); g.lineBetween(14, 12, 14, 34); g.lineBetween(30, 12, 30, 34);
+      g.fillStyle(col, 1); g.fillRect(19, 14, 6, 8); g.fillStyle(0x1a1208, 1); g.fillCircle(22, 18, 1.5);
+      for (let k = 0; k < i; k++) { g.fillStyle(W, 0.9); g.fillTriangle(22 - 8 + k * 16, 2, 22 - 11 + k * 16, 8, 22 - 5 + k * 16, 8); }
+    }));
   }
 
   // ---------------------------------------------------------------------------------------
@@ -209,6 +338,7 @@ class BootScene extends Phaser.Scene {
     this.tex('glow', 64, 64, g => this.glow(g, 32, 32, 32, W, 0.16));
     this.tex('fire', 40, 40, g => { this.glow(g, 20, 20, 20, 0xff9a3c, 0.18); g.fillStyle(0xffe94d, 0.8); g.fillCircle(20, 20, 6); });
     this.tex('orbiter', 20, 20, g => { this.glow(g, 10, 10, 10, 0x00f0ff, 0.14); this.poly(g, [[10, 2], [17, 10], [10, 18], [3, 10]], 0x00f0ff, W, 2, 0.6); });
+    this.tex('orbshield', 22, 22, g => { this.glow(g, 11, 11, 11, 0x5dff8a, 0.12); g.lineStyle(3, 0x5dff8a, 1); g.beginPath(); g.arc(11, 11, 8, Math.PI * 1.15, Math.PI * 1.85); g.strokePath(); g.fillStyle(0x5dff8a, 0.3); g.fillRect(4, 4, 14, 4); });
     this.tex('mine', 24, 24, g => {
       this.glow(g, 12, 12, 12, 0xff9a3c, 0.12);
       g.fillStyle(0x2a1608, 1); g.fillCircle(12, 12, 7); g.lineStyle(2, 0xff9a3c, 1); g.strokeCircle(12, 12, 7);

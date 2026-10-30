@@ -142,7 +142,7 @@ class Enemy extends Entity {
       if (od > 0 && od < this.radius + o.radius + 4) { vx += (ox / od) * 0.6; vy += (oy / od) * 0.6; }
     }
     const l = Math.hypot(vx, vy) || 1;
-    const sp = this.cfg.speed * (1 + 0.05 * (this.gs.floor - 1)) * speedMult * this.speedFactor() * this.eliteSpeed;
+    const sp = this.cfg.speed * (1 + 0.05 * (this.gs.floor - 1)) * speedMult * this.speedFactor() * this.eliteSpeed * this.gs.diff.speed;
     this.move((vx / l) * sp * dt, (vy / l) * sp * dt);
     this.moveDir.set(vx / l, vy / l);
   }

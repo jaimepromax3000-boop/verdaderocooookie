@@ -153,6 +153,65 @@ const Modules = {
         },
       },
     },
+    // ---------- mejoras añadidas (v3): cada nivel puede cambiar el efecto (campo `lv`) ----------
+    orbshield: {
+      name: 'Escudos orbitales', letter: 'H', color: 0x5dff8a, max: 5,
+      desc: '+1 escudo que orbita a tu alrededor y bloquea 1 bala (se regenera en 10 s).',
+      onAcquire(player) { player.addOrbiter(null, 'shield'); },
+    },
+    rapid: {
+      name: 'Cadencia de fuego', letter: 'Z', color: 0xffe94d, max: 5,
+      lv: ['+25 % de disparos por segundo.', 'DOBLE DISPARO: dos balas paralelas.', '+25 % más de cadencia.', 'TRIPLE DISPARO: tres balas paralelas.', 'Cadencia +20 % más: lluvia de balas.'],
+      desc: 'Más disparos por segundo; en los niveles 2 y 4 se añade una bala más.',
+      mod(spec, n) { spec.rateMult *= [1, 1.25, 1.25, 1.45, 1.45, 1.7][n]; spec.multi = [1, 1, 2, 2, 3, 3][n]; },
+    },
+    forcefield: {
+      name: 'Campo de fuerza', letter: 'Y', color: 0x00f0ff, max: 5,
+      desc: 'Un área a tu alrededor daña a los enemigos que la tocan. Cada nivel la agranda y la hace más dañina.',
+    },
+    power: {
+      name: 'Sobrecarga de daño', letter: 'J', color: 0xff4466, max: 5,
+      desc: '+18 % de daño en todos tus ataques.',
+      onAcquire(player) { player.damageMult *= 1.18; },
+    },
+    nano: {
+      name: 'Nanobots reparadores', letter: 'L', color: 0x5dff8a, max: 3,
+      desc: 'Al limpiar una sala recuperas medio corazón por nivel.',
+      hooks: { 'room:clear'(e, n, scene) { scene.player.heal(0.5 * n); } },
+    },
+    maxhp: {
+      name: 'Núcleo ampliado', letter: 'Q', color: 0xff4466, max: 3,
+      desc: '+1 vida máxima y te cura 1 corazón.',
+      onAcquire(player) { player.maxHp += 1; player.hp += 1; },
+    },
+    servo: {
+      name: 'Servomotores', letter: 'I', color: 0xffe94d, max: 4,
+      desc: '+8 % de velocidad de movimiento.',
+      onAcquire(player) { player.moveSpeed *= 1.08; },
+    },
+    dodge: {
+      name: 'Fase aleatoria', letter: '~', color: 0x9b5cff, max: 4,
+      desc: '8 % de probabilidad por nivel de esquivar un golpe.',
+    },
+    thorns: {
+      name: 'Espinas de datos', letter: '#', color: 0xff9a3c, max: 3,
+      desc: 'Al recibir un golpe liberas una onda que daña a los enemigos cercanos.',
+      hooks: { 'player:hit'(e, n, scene) { scene.shockwave(scene.player.x, scene.player.y, 80 + 25 * n, 1.5 * n * scene.player.damageMult, 0, 0xff9a3c, false); } },
+    },
+    timefield: {
+      name: 'Campo temporal', letter: '%', color: 0x7fe9ff, max: 3,
+      desc: 'Las balas enemigas cercanas van más lentas (-25 % por nivel).',
+    },
+    dashcd: {
+      name: 'Dash afilado', letter: '>', color: 0x00f0ff, max: 3,
+      desc: '-20 % de enfriamiento del dash.',
+      onAcquire(player) { player.dashCooldown *= 0.8; },
+    },
+    abilitycd: {
+      name: 'Reciclaje de habilidad', letter: '@', color: 0xff2bd6, max: 3,
+      desc: '-15 % de enfriamiento de tu habilidad (Q).',
+      onAcquire(player) { player.abilityCooldown *= 0.85; player.abilityCdT *= 0.85; },
+    },
     echo: {
       name: 'Eco de dash', letter: 'D', color: 0xff2bd6, max: 2,
       desc: 'El dash deja una estela dañina (con "Rastro incendiario" arde).',
@@ -163,6 +222,12 @@ const Modules = {
   },
 
   ids() { return Object.keys(this.defs); },
+
+  /** Datos de una carta de mejora: nivel que se alcanzaría y su descripción. */
+  card(id, player) {
+    const d = this.defs[id], lvl = player.stack(id) + 1;
+    return { id, name: d.name, letter: d.letter, color: d.color, level: lvl, max: d.max, desc: d.lv ? d.lv[lvl - 1] : d.desc };
+  },
 
   /** Registra todos los hooks en el EventBus. Cada manejador comprueba que el jugador tenga el módulo. */
   install(scene) {

@@ -12,11 +12,11 @@ const CFG = {
 
 /** Personajes seleccionables en el menú. Cada uno tiene una habilidad activa (tecla Q o clic derecho). */
 const CHARACTERS = [
-  { id: 'hacker', name: 'Hacker de Almas', desc: 'Equilibrado.', color: 0x00f0ff, ship: 'ship_hacker', hp: 6, shield: 1, speed: 1.0, damage: 1.0,
+  { id: 'hacker', name: 'Estándar', desc: 'Equilibrada.', color: 0x00f0ff, wp: 'wp_hacker', hp: 6, shield: 1, speed: 1.0, damage: 1.0,
     ability: { id: 'emp', name: 'Pulso EMP', cd: 9, desc: 'Borra balas y aturde a los enemigos cercanos.' } },
-  { id: 'ghost',  name: 'Fantasma',         desc: 'Rápido y frágil.', color: 0xff2bd6, ship: 'ship_ghost', hp: 4, shield: 1, speed: 1.2, damage: 1.0,
+  { id: 'ghost',  name: 'Ligero',           desc: 'Rápida y frágil.', color: 0xff2bd6, wp: 'wp_ghost', hp: 4, shield: 1, speed: 1.2, damage: 1.0,
     ability: { id: 'phase', name: 'Fase espectral', cd: 10, desc: '2,5 s intangible y rápido, con estela de fuego.' } },
-  { id: 'daemon', name: 'Daemon',           desc: 'Resistente y lento.', color: 0xffe94d, ship: 'ship_daemon', hp: 8, shield: 0, speed: 0.88, damage: 1.1,
+  { id: 'daemon', name: 'Pesado',           desc: 'Resistente y lenta.', color: 0xffe94d, wp: 'wp_daemon', hp: 8, shield: 0, speed: 0.88, damage: 1.1,
     ability: { id: 'swarm', name: 'Enjambre', cd: 12, desc: '3 satélites orbitan 8 s: dañan y bloquean balas.' } },
 ];
 
@@ -51,18 +51,51 @@ const UPGRADES = [
 /** Metaprogresión persistente: divisa "Fragmentos de Núcleo" y mejoras compradas. */
 const Meta = {
   KEY: 'neon-labyrinth-save-v1',
-  data: { fragments: 0, upgrades: {}, bestFloor: 0, bestRooms: 0, runs: 0, wins: 0 },
+  defaults() {
+    return {
+      fragments: 0, coins: 0, upgrades: {}, bestFloor: 0, bestRooms: 0, runs: 0, wins: 0,
+      name: 'Operador', skin: 'operator', skins: ['operator'], loadout: 'hacker', difficulty: 1,
+      missions: [], totals: { kills: 0, rooms: 0, bosses: 0, chests: 0 },
+    };
+  },
+  data: null,
 
   load() {
+    this.data = this.defaults();
     try {
       const raw = localStorage.getItem(this.KEY);
       if (raw) this.data = Object.assign(this.data, JSON.parse(raw));
     } catch (e) { /* localStorage no disponible: se juega sin guardar */ }
+    const d = this.data;
+    if (!Array.isArray(d.skins) || !d.skins.includes('operator')) d.skins = ['operator'].concat(d.skins || []);
+    if (!d.skins.includes(d.skin)) d.skin = 'operator';
+    if (!Array.isArray(d.missions)) d.missions = [];
+    if (!d.totals) d.totals = { kills: 0, rooms: 0, bosses: 0, chests: 0 };
+    if (typeof Missions !== 'undefined') Missions.ensure();
   },
 
   save() {
     try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* ignorar */ }
   },
+
+  addCoins(n) { this.data.coins += Math.max(0, Math.round(n)); this.save(); },
+
+  setName(n) {
+    n = String(n || '').replace(/[^\wÁÉÍÓÚÜÑáéíóúüñ \-]/g, '').trim().slice(0, 14);
+    this.data.name = n || 'Operador';
+    this.save();
+  },
+
+  hasSkin(id) { return this.data.skins.includes(id); },
+
+  buySkin(id) {
+    const s = SKINS.find(k => k.id === id);
+    if (!s || this.hasSkin(id) || s.chestOnly || this.data.coins < s.price) return false;
+    this.data.coins -= s.price; this.data.skins.push(id); this.save();
+    return true;
+  },
+
+  equipSkin(id) { if (this.hasSkin(id)) { this.data.skin = id; this.save(); } },
 
   level(id) { return this.data.upgrades[id] || 0; },
 
@@ -88,7 +121,8 @@ const Meta = {
   },
 
   reset() {
-    this.data = { fragments: 0, upgrades: {}, bestFloor: 0, bestRooms: 0, runs: 0, wins: 0 };
+    this.data = this.defaults();
+    if (typeof Missions !== 'undefined') Missions.ensure();
     this.save();
   },
 };

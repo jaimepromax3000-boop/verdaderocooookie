@@ -19,18 +19,21 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 | Recoger, comprar, usar portal | E |
 | Pausa | ESC |
 
+## Menú principal
+
+- **PARTIDA**: nombre de usuario (se guarda), **skin** (solo estética), **arma** (Estándar, Ligero o Pesado, con su habilidad Q) y **dificultad** (Fácil, Normal, Difícil).
+- **TIENDA**: *Mejoras permanentes* (se pagan con Fragmentos de Núcleo) y *Skins* (se pagan con monedas, o salen en cofres).
+- **MISIONES**: 3 activas ("elimina 10 Blindados", "limpia 6 salas"...). El progreso cuenta entre partidas y se reclama la recompensa (monedas, fragmentos o un cofre).
+
 ## Bucle de juego
 
-- Sala inicial segura: eliges arma (Pulso, Dispersor, Lanza Riel).
-- 3 personajes con habilidad activa: **Hacker** (Pulso EMP: borra balas y aturde), **Fantasma** (Fase espectral: intangible, rápido y con estela de fuego) y **Daemon** (Enjambre: 3 satélites que dañan y bloquean balas).
-- 3 biomas (Servidores, Red Neuronal, Núcleo Central), cada uno con su paleta, y un jefe distinto por planta.
-- 3 plantas de 10–15 salas; las puertas se sellan al entrar y se abren al matar a todos los enemigos.
-- Al limpiar una sala cae una recompensa visible (créditos, reparación, módulos, llaves).
-- Salas de combate con 1 o 2 oleadas, trampas de pinchos con aviso, barriles explosivos y 12 diseños de obstáculos.
-- Enemigos: Virus, Centinela, Invocador, Dron, Francotirador (aviso láser), Blindado (onda de balas), Bomba lógica, Torreta, Espectro (teletransporte) y Fractal (se divide), más **élites** con afijos (veloz, volátil, blindado).
-- Salas especiales: **Tienda**, **Tesoro** oculto (puerta con llave) y **Jefe** en el punto más lejano.
-- Al morir pierdes lo de la partida, pero conservas los **Fragmentos de Núcleo** para el árbol de habilidades
-  permanente (se guarda en `localStorage`).
+- Sala inicial segura: eliges arma inicial (Pulso, Dispersor, Lanza Riel).
+- 3 plantas de 10–15 salas con biomas distintos y un jefe diferente por planta; las puertas se sellan al entrar y se abren al matar a todos los enemigos (algunas salas tienen 2 oleadas).
+- **Al limpiar una sala eliges 1 de 3 mejoras temporales** aleatorias y distintas. Duran una partida y tienen niveles: escudos orbitales, cadencia de fuego (más disparos por segundo, luego doble y triple disparo), campo de fuerza, daño, nanobots, velocidad, esquiva, espinas, campo temporal... 31 en total.
+- **El jefe suelta un cofre** (Bronce / Plata / Oro según el jefe y la dificultad) con monedas, fragmentos, mejoras permanentes o skins. Se abre con E.
+- Salas especiales: **Tienda** (mejoras temporales con créditos), **Tesoro** oculto (puerta con llave) y **Jefe** en el punto más lejano.
+- Trampas de pinchos con aviso, barriles explosivos, 12 diseños de obstáculos y enemigos variados (Virus, Centinela, Invocador, Dron, Francotirador, Blindado, Bomba lógica, Torreta, Espectro, Fractal) con **élites**.
+- Al morir pierdes lo de la partida; conservas fragmentos, monedas, skins y misiones. La dificultad multiplica las recompensas.
 
 ## Estructura
 
@@ -41,10 +44,11 @@ src/
 ├── main.js                     configuración de Phaser
 ├── core/
 │   ├── Config.js               constantes, personajes, armas, mejoras permanentes, guardado, RNG con semilla
+│   ├── Progress.js             skins, dificultades, cofres de jefe y misiones
 │   ├── EventBus.js             bus de eventos global (base del sistema de sinergias)
 │   ├── StateMachine.js         FSM genérica para la IA
 │   ├── ObjectPool.js           pool de proyectiles y partículas
-│   └── Modules.js              19 módulos de software (nuevos: Satélites, Minas de fase, Núcleo crítico, Imán, Onda de choque) y sus ganchos de eventos
+│   └── Modules.js              31 mejoras temporales (módulos) con niveles y sus ganchos de eventos
 ├── utils/
 │   ├── DungeonGenerator.js     mapa procedural, clasificación de salas, distribución de obstáculos
 │   └── Pathfinding.js          A* (heap binario, sin cortar esquinas) + línea de visión (Bresenham)
@@ -52,7 +56,7 @@ src/
 │   ├── Entity.js  Player.js  Enemy.js  Projectile.js  Item.js
 └── scenes/
     ├── BootScene.js            genera todo el arte por código y carga el guardado
-    ├── MenuScene.js            personaje + árbol de habilidades
+    ├── MenuScene.js            Partida / Tienda / Misiones
     ├── GameScene.js            salas, combate, puertas, recompensas
     └── UIScene.js              HUD en paralelo (vida/escudo, minimapa, buffs, módulos)
 ```

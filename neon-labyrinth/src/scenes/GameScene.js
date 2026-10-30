@@ -10,6 +10,9 @@ class GameScene extends Phaser.Scene {
     this.charId = (data && data.character) || 'hacker';
     this.seedBase = (data && data.seed) || ((Math.random() * 1e9) | 0);
     this.autoFire = !!(data && data.autoFire);
+    this.skinId = (data && data.skin) || Meta.data.skin;
+    const di = data && data.difficulty !== undefined ? data.difficulty : Meta.data.difficulty;
+    this.diff = DIFFICULTIES[Math.max(0, Math.min(2, di === undefined ? 1 : di))];
   }
 
   create() {
@@ -54,12 +57,16 @@ class GameScene extends Phaser.Scene {
     this.particles = [];
 
     const ch = CHARACTERS.find(c => c.id === this.charId);
-    this.player = new Player(this, W / 2, OY + (RH * T) / 2, ch, 'pulse');
+    this.player = new Player(this, W / 2, OY + (RH * T) / 2, ch, 'pulse', this.skinId);
+    this.runKills = 0; this.creditsEarned = 0; this.upgradesPicked = 0; this.choosing = false; this.chestOpen = false;
     this.hookOffs = Modules.install(this);
     this.busOffs = [
       Bus.on('player:dead', () => this.endRun(false)),
       Bus.on('player:hit', e => { this.cameras.main.shake(e.crit ? 220 : 110, e.crit ? 0.008 : 0.004); this.sfx('hurt'); }),
       Bus.on('enemy:killed', e => this.onEnemyKilled(e.enemy)),
+      Bus.on('enemy:killed', e => { this.runKills++; Meta.data.totals.kills++; Missions.track('kill', 1, { type: e.enemy.type, elite: !!e.enemy.elite }); }),
+      Bus.on('room:clear', () => { Meta.data.totals.rooms++; Missions.track('room'); }),
+      Bus.on('player:ability', () => Missions.track('ability')),
     ];
 
     this.keyE = this.input.keyboard.addKey('E');
@@ -100,6 +107,7 @@ class GameScene extends Phaser.Scene {
       const nb = this.dungeon.get(tr.gx + d.dx, tr.gy + d.dy);
       if (nb) this.lockedDoors[DungeonGenerator.key(nb.gx, nb.gy) + ':' + d.opp] = true;
     }
+    Missions.track('floor', n);
     Bus.emit('floor:new', { floor: n, dungeon: this.dungeon, theme: this.theme });
     this.enterRoom(this.dungeon.start, null);
   }
@@ -177,7 +185,7 @@ class GameScene extends Phaser.Scene {
         this.spawnEnemy('boss', c.x, c.y - 40);
         break;
       default: {
-        const budget = 4 + f * 1.4 + room.dist * 0.35 + rng() * 2;
+        const budget = (4 + f * 1.4 + room.dist * 0.35 + rng() * 2) * this.diff.count;
         room.wavesTotal = budget > 7.5 ? 2 : 1;
         room.wave = 1;
         room.waveBudget = room.wavesTotal === 2 ? [budget * 0.55, budget * 0.5] : [budget];
@@ -204,7 +212,7 @@ class GameScene extends Phaser.Scene {
       spent += COST[type]; n++;
       const p = this.randomFreePoint(14, type === 'turret' ? 110 : 150);
       let elite = null;
-      if (!eliteDone && room.dist >= 2 && ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker'].includes(type) && rng() < [0.1, 0.2, 0.3][Math.min(2, f - 1)]) {
+      if (!eliteDone && room.dist >= 2 && ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker'].includes(type) && rng() < [0.1, 0.2, 0.3][Math.min(2, f - 1)] * this.diff.elite) {
         elite = rng.pick(['fast', 'volatile', 'armored']); eliteDone = true;
       }
       this.spawnEnemy(type, p.x, p.y, false, elite);
@@ -214,7 +222,7 @@ class GameScene extends Phaser.Scene {
 
   spawnEnemy(type, x, y, minion = false, elite = null) {
     const f = this.floor;
-    const scale = (type === 'boss' ? 1 + 0.4 * (f - 1) : 1 + 0.28 * (f - 1));
+    const scale = (type === 'boss' ? 1 + 0.4 * (f - 1) : 1 + 0.28 * (f - 1)) * this.diff.hp;
     let variant = null;
     if (type === 'shooter' && f >= 2) variant = this.rng() < 0.5 ? 'cryo' : (f >= 3 ? 'toxic' : null);
     const e = new Enemy(this, x, y, type, scale, variant, elite);
@@ -231,8 +239,7 @@ class GameScene extends Phaser.Scene {
     if (!e.minion && this.rng() < 0.4 + 0.1 * this.player.luck) this.addItem('coin', e.x, e.y, {});
     if (e.elite) {                                              // los élites sueltan botín extra
       for (let i = 0; i < 3; i++) this.addItem('coin', e.x + (this.rng() - 0.5) * 40, e.y + (this.rng() - 0.5) * 40, {});
-      if (this.rng() < 0.4) this.addItem('heart', e.x, e.y, {});
-      else if (this.rng() < 0.3 && Modules.roll(this.rng, this.player, 1).length) this.addItem('module', e.x, e.y, { id: Modules.roll(this.rng, this.player, 1)[0] });
+      if (this.rng() < 0.45) this.addItem('heart', e.x, e.y, {});
       this.floatText(e.x, e.y - 24, 'ÉLITE ELIMINADO', ELITE_AFFIX[e.elite].color);
     }
     if (this.sealed && !this.enemies.some(x => !x.dead)) {
@@ -256,8 +263,9 @@ class GameScene extends Phaser.Scene {
     const c = this.roomCenter();
     if (room.type === 'boss') {
       this.bossesKilled++;
-      const id = Modules.roll(this.rng, this.player, 1)[0];
-      if (id) this.addItem('module', c.x - 60, c.y, { id, group: 'bossreward' });
+      Meta.data.totals.bosses++; Missions.track('boss');
+      const tier = Math.max(1, Math.min(3, this.floor + this.diff.chest));       // calidad del cofre: jefe + dificultad
+      this.addItem('chest', c.x - 60, c.y, { tier });
       this.addItem('portal', c.x + 60, c.y, {});
       this.floatText(c.x, c.y - 60, 'SERVIDOR PURGADO', 0x00f0ff);
       this.cameras.main.flash(300, 0, 240, 255);
@@ -265,6 +273,7 @@ class GameScene extends Phaser.Scene {
       this.dropReward(c.x, c.y);
     }
     Bus.emit('room:clear', { room });
+    if (room.type === 'combat' || room.type === 'boss') this.time.delayedCall(650, () => this.offerUpgrades());
   }
 
   /** Recompensa visible al limpiar una sala: créditos, salud, llave o módulo de software. */
@@ -272,11 +281,9 @@ class GameScene extends Phaser.Scene {
     const rng = this.rng, luck = this.player.luck;
     const r = rng() * 100;
     this.spawnBurst(x, y, 0x00f0ff, 18);
-    if (r < 12 + 6 * luck && Modules.roll(rng, this.player, 1).length) {
-      this.addItem('module', x, y, { id: Modules.roll(rng, this.player, 1)[0] });
-    } else if (r < 38) {
+    if (r < 30) {
       this.addItem('heart', x, y, {});
-    } else if (r < 52) {
+    } else if (r < 42 + 3 * luck) {
       this.addItem('key', x, y, {});
     } else {
       const n = rng.int(3, 6) + luck;
@@ -444,7 +451,8 @@ class GameScene extends Phaser.Scene {
       p.credits -= it.price;
     }
     switch (it.kind) {
-      case 'coin': p.credits += 1; this.sfx('coin'); break;
+      case 'coin': p.credits += 1; this.creditsEarned++; Missions.track('coins'); this.sfx('coin'); break;
+      case 'chest': this.openChest(it.data2.tier || 1); this.sfx('module'); break;
       case 'heart':
         if (!it.price && p.hp >= p.maxHp) { it.baseY -= 0; return; }      // no se desperdicia con la vida llena
         p.heal(1); this.sfx('heal'); break;
@@ -462,7 +470,11 @@ class GameScene extends Phaser.Scene {
         this.sfx('module');
         Bus.emit('player:weapon', { weapon: p.weapon });
         break;
-      case 'portal': this.nextFloor(); break;
+      case 'portal': {
+        const chest = this.items.find(o => o.kind === 'chest' && !o.collected);
+        if (chest) { this.floatText(it.x, it.y - 30, '¡Abre antes el cofre!', 0xffd23c); this.collect(chest); return; }   // el cofre se abre siempre antes de salir
+        this.nextFloor(); break;
+      }
     }
     Bus.emit('player:inventory', {});
     it.remove();
@@ -491,7 +503,7 @@ class GameScene extends Phaser.Scene {
   updateBullets(dt) {
     const p = this.player;
     this.bulletPool.forEach(b => {
-      if (!b.step(dt)) { this.releaseBullet(b); return; }
+      if (!b.step(dt * this.bulletTimeScale(b))) { this.releaseBullet(b); return; }
       for (const br of this.barrels) {                         // los barriles explosivos reciben balas de cualquiera
         if ((br.x - b.x) ** 2 + (br.y - b.y) ** 2 < 17 * 17) { br.hp -= b.spec.damage; this.spark(b.x, b.y, 0xff9a3c, 1); if (br.hp <= 0) this.blowBarrel(br); this.releaseBullet(b); return; }
       }
@@ -563,6 +575,71 @@ class GameScene extends Phaser.Scene {
     for (let i = 1; i < 5; i++) g.lineTo(x1 + (x2 - x1) * i / 5 + (this.rng() - 0.5) * 14, y1 + (y2 - y1) * i / 5 + (this.rng() - 0.5) * 14);
     g.lineTo(x2, y2); g.strokePath();
     this.time.delayedCall(90, () => g.clear());
+  }
+
+  // ===================================================================================
+  //  Mejoras de sala (elige 1 de 3), cofre de jefe y campo de fuerza
+  // ===================================================================================
+  /** Tras limpiar una sala: 3 mejoras temporales distintas y aleatorias; el juego se detiene hasta elegir. */
+  offerUpgrades() {
+    if (this.runOver || this.choosing || this.player.dead) return;
+    const ids = Modules.roll(this.rng, this.player, 3);
+    if (!ids.length) return;
+    this.choosing = true;
+    Bus.emit('upgrade:offer', { cards: ids.map(id => Modules.card(id, this.player)) });
+  }
+
+  pickUpgrade(id) {
+    if (!this.choosing) return;
+    if (this.player.addModule(id)) {
+      const d = Modules.defs[id];
+      this.floatText(this.player.x, this.player.y - 30, `${d.name} Nv ${this.player.stack(id)}`, d.color);
+      this.spawnBurst(this.player.x, this.player.y, d.color, 18);
+      this.ringFx(this.player.x, this.player.y, 60, d.color);
+      this.upgradesPicked++; Missions.track('upgrade');
+      this.sfx('module');
+    }
+    this.choosing = false;
+    Bus.emit('upgrade:picked', { id });
+  }
+
+  openChest(tier) {
+    const items = Chests.open(tier, () => this.rng());
+    this.chestOpen = true;
+    this.cameras.main.flash(200, 255, 220, 120);
+    Bus.emit('chest:open', { tier, items });
+  }
+
+  closeChest() { this.chestOpen = false; }
+
+  /** Campo de fuerza: área alrededor del jugador que daña a los enemigos que la tocan. */
+  updateForcefield(dt) {
+    const p = this.player, n = p.stack('forcefield');
+    if (!this.ffGfx) { this.ffGfx = this.add.graphics().setDepth(7); this.ffT = 0; }
+    const g = this.ffGfx;
+    g.clear();
+    if (!n || p.dead) return;
+    const R = 52 + 24 * n, dps = 2 + 1.8 * n, t = this.time.now / 1000;
+    g.fillStyle(0x00f0ff, 0.06 + 0.02 * n); g.fillCircle(p.x, p.y, R);
+    g.lineStyle(2, 0x00f0ff, 0.55 + 0.25 * Math.sin(t * 5)); g.strokeCircle(p.x, p.y, R);
+    g.lineStyle(3, 0x00f0ff, 0.7);
+    for (let i = 0; i < 3; i++) { const a = t * 1.8 + i * 2.094; g.beginPath(); g.arc(p.x, p.y, R - 5, a, a + 0.8); g.strokePath(); }
+    this.ffT -= dt;
+    if (this.ffT > 0) return;
+    this.ffT = 0.25;
+    for (const e of this.enemies) {
+      if (e.dead || e.spawnT > 0 || (e.x - p.x) ** 2 + (e.y - p.y) ** 2 > (R + e.radius) ** 2) continue;
+      e.takeDamage(dps * 0.25 * p.damageMult, 'player', { color: 0x00f0ff });
+      if (n >= 3 && !e.dead) e.addStatus('slow', 0.6, 0.7);
+      this.spark(e.x, e.y, 0x00f0ff, 1);
+    }
+  }
+
+  /** Campo temporal: las balas enemigas cercanas al jugador van más lentas. */
+  bulletTimeScale(b) {
+    const p = this.player, n = p.stack('timefield');
+    if (!n || b.owner !== 'enemy') return 1;
+    return (b.x - p.x) ** 2 + (b.y - p.y) ** 2 < (110 + 30 * n) ** 2 ? Math.max(0.3, 1 - 0.25 * n) : 1;
   }
 
   // ===================================================================================
@@ -762,7 +839,7 @@ class GameScene extends Phaser.Scene {
   update(time, delta) {
     if (this.runOver) return;
     if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) { this.paused = !this.paused; Bus.emit('game:pause', { paused: this.paused }); }
-    if (this.paused) return;
+    if (this.paused || this.choosing || this.chestOpen) return;
     const dt = Math.min(0.05, delta / 1000);
 
     this.player.update(dt);
@@ -773,6 +850,7 @@ class GameScene extends Phaser.Scene {
     this.updateParticles(dt);
     this.updateHazards(dt);
     this.updateMines(dt);
+    this.updateForcefield(dt);
     this.drawOver();
     this.bgGrid.tilePositionX += dt * 8; this.bgGrid.tilePositionY += dt * 5;
     this.contactDamage();
@@ -830,12 +908,16 @@ class GameScene extends Phaser.Scene {
   endRun(win) {
     if (this.runOver) return;
     this.runOver = true;
-    const frag = this.roomsCleared * 2 + (this.floor - 1) * 6 + this.bossesKilled * 12 + (win ? 25 : 0);
+    const d = this.diff;
+    const baseFrag = this.roomsCleared * 2 + (this.floor - 1) * 6 + this.bossesKilled * 12 + (win ? 25 : 0);
+    const frag = Math.round(baseFrag * d.reward);
+    const coins = Math.round((this.player.credits * 0.5 + this.roomsCleared * 2 + this.bossesKilled * 15 + (win ? 60 : 0)) * d.reward);
     Meta.addFragments(frag);
-    Meta.data.runs++; if (win) Meta.data.wins++;
+    Meta.data.coins += coins;
+    Meta.data.runs++; if (win) { Meta.data.wins++; Missions.track('win', 1, { diff: DIFFICULTIES.indexOf(d) }); }
     Meta.data.bestFloor = Math.max(Meta.data.bestFloor, this.floor);
     Meta.data.bestRooms = Math.max(Meta.data.bestRooms, this.roomsCleared);
     Meta.save();
-    Bus.emit('run:end', { win, fragments: frag, rooms: this.roomsCleared, floor: this.floor });
+    Bus.emit('run:end', { win, fragments: frag, coins, rooms: this.roomsCleared, floor: this.floor, kills: this.runKills, diff: d.name });
   }
 }
