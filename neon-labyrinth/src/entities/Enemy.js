@@ -27,7 +27,7 @@ const ENEMY_TYPES = {
   spinner:  { tex: 'enemy_spinner',  hp: 8,  speed: 34,  r: 15, contact: 0, range: 360, name: 'Giróscopo',      color: 0xc65cff },
   dasher:   { tex: 'enemy_dasher',   hp: 3,  speed: 100, r: 11, contact: 1, range: 190, name: 'Embestidor',     color: 0xff5c8a },
   healer:   { tex: 'enemy_healer',   hp: 5,  speed: 60,  r: 12, contact: 0, range: 300, name: 'Reparador',      color: 0x5dff8a },
-  boss:     { tex: 'enemy_boss1',    hp: 80, speed: 62,  r: 30, contact: 1, range: 330, name: 'Guardián',       color: 0xff2bd6 },
+  boss:     { tex: 'enemy_boss1',    hp: 170, speed: 62,  r: 30, contact: 1, range: 330, name: 'Guardián',       color: 0xff2bd6 },
 };
 
 /** Un jefe distinto por planta. */
@@ -46,7 +46,7 @@ const bossKindFor = f => (f >= CFG.FLOORS ? 6 : f <= 6 ? f : ((f - 1) % 6) + 1);
 const bossSuffix = f => { const t = f >= CFG.FLOORS ? 5 : Math.floor((f - 1) / 6) + 1; return t > 1 ? ' Mk ' + ['', '', 'II', 'III', 'IV', 'V'][t] : ''; };
 /** Escalado de vida de enemigos con la profundidad (se suaviza a partir de la planta 10). */
 const depthHp = f => (f <= 10 ? 1 + 0.28 * (f - 1) : 1 + 0.28 * 9 + 0.17 * (f - 10));
-const depthBossHp = f => (f <= 10 ? 1 + 0.5 * (f - 1) : 1 + 0.5 * 9 + 0.28 * (f - 10));
+const depthBossHp = f => (f <= 10 ? 1 + 0.6 * (f - 1) : 1 + 0.6 * 9 + 0.34 * (f - 10));
 /** Daño enemigo extra en plantas profundas (1 hasta la 10). */
 const depthDmg = f => 1 + 0.03 * Math.max(0, f - 10);
 

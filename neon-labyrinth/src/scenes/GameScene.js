@@ -199,10 +199,14 @@ class GameScene extends Phaser.Scene {
         this.spawnEnemy('boss', c.x, c.y - 40);
         break;
       default: {
-        const budget = (4 + f * 1.4 + room.dist * 0.35 + rng() * 2) * this.diff.count;
-        room.wavesTotal = budget > 22 ? 3 : budget > 7.5 ? 2 : 1;                   // las salas profundas tienen hasta 3 oleadas
+        // cada sala de combate nueva tiene UN enemigo más que la anterior (cuenta las ya limpiadas en esta planta)
+        const k = this.dungeon.list.filter(r => r.type === 'combat' && r.cleared).length;
+        const N = Math.max(3, Math.min(32, Math.round((3 + Math.floor(f / 3) + k) * this.diff.count)));
+        room.totalEnemies = N;
+        room.wavesTotal = N > 26 ? 3 : N > 12 ? 2 : 1;                              // las salas con muchos enemigos se reparten en oleadas
         room.wave = 1;
-        room.waveBudget = room.wavesTotal === 3 ? [budget * 0.42, budget * 0.36, budget * 0.3] : room.wavesTotal === 2 ? [budget * 0.55, budget * 0.5] : [budget];
+        room.waveCounts = room.wavesTotal === 3 ? [Math.round(N * 0.4), Math.round(N * 0.35)] : room.wavesTotal === 2 ? [Math.ceil(N * 0.55)] : [];
+        room.waveCounts.push(N - room.waveCounts.reduce((a, b) => a + b, 0));
         this.spawnWave(room, 1);
       }
     }
@@ -213,14 +217,15 @@ class GameScene extends Phaser.Scene {
     const f = this.floor, rng = this.rng;
     const COST = SPAWN_COST, W = SPAWN_TABLES[spawnTier(f)];
     const total = Object.values(W).reduce((a, b) => a + b, 0);
-    let budget = room.waveBudget[wave - 1], spent = 0, n = 0;
+    const target = room.waveCounts[wave - 1];
+    let n = 0, healers = 0;
     let eliteLeft = (wave === 1 ? 1 : (f >= 6 ? 1 : 0)) + (f >= 10 ? 1 : 0) + (f >= 18 ? 1 : 0);     // más élites por sala cuanto más profundo
-    const maxN = Math.min(22, 10 + Math.floor(f / 2));
-    while (n < maxN && (spent < budget || n < 2)) {
+    while (n < target) {
       let r = rng() * total, type = 'grunt';
       for (const [k, w] of Object.entries(W)) { if ((r -= w) <= 0) { type = k; break; } }
-      if (spent + COST[type] > budget + 0.9 && n >= 2) break;
-      spent += COST[type]; n++;
+      if (type === 'healer' && healers >= 2) type = 'grunt';
+      if (type === 'healer') healers++;
+      n++;
       const p = this.randomFreePoint(14, type === 'turret' ? 110 : 150);
       let elite = null;
       if (eliteLeft > 0 && room.dist >= 2 && ELITE_TYPES.includes(type) && rng() < Math.min(0.6, 0.1 + 0.04 * (f - 1)) * this.diff.elite) {
