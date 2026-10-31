@@ -201,7 +201,7 @@ class GameScene extends Phaser.Scene {
       default: {
         // cada sala de combate nueva tiene UN enemigo más que la anterior (cuenta las ya limpiadas en esta planta)
         const k = this.dungeon.list.filter(r => r.type === 'combat' && r.cleared).length;
-        const N = Math.max(3, Math.min(32, Math.round((3 + Math.floor(f / 3) + k) * this.diff.count)));
+        const N = Math.max(3, Math.min(40, Math.floor(3 + Math.floor(f / 3) + this.diff.step * k + 1e-9)));       // +1 normal, +2 difícil, +0,5 fácil (se acumula)
         room.totalEnemies = N;
         room.wavesTotal = N > 26 ? 3 : N > 12 ? 2 : 1;                              // las salas con muchos enemigos se reparten en oleadas
         room.wave = 1;

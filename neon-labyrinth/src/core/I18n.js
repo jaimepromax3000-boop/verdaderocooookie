@@ -48,9 +48,9 @@ const I18n = {
     '[Q] LISTA': ['[Q] READY', '[Q] PRÊTE'],
     // --- dificultades ---
     'FÁCIL': ['EASY', 'FACILE'], 'NORMAL': ['NORMAL', 'NORMAL'], 'DIFÍCIL': ['HARD', 'DIFFICILE'],
-    'Menos enemigos y más débiles. Recompensas x0,7.': ['Fewer, weaker enemies. Rewards x0.7.', 'Moins d\'ennemis, plus faibles. Récompenses x0,7.'],
-    'La experiencia equilibrada. Recompensas x1.': ['The balanced experience. Rewards x1.', 'L\'expérience équilibrée. Récompenses x1.'],
-    'Enemigos con +45 % de vida y +50 % de daño, más numerosos. Tu vida no cambia. Recompensas x1,7.': ['Enemies with +45 % health and +50 % damage, in greater numbers. Your health does not change. Rewards x1.7.', 'Ennemis avec +45 % de vie et +50 % de dégâts, plus nombreux. Votre vie ne change pas. Récompenses x1,7.'],
+    'Enemigos más débiles. +0,5 enemigos por sala nueva (uno más cada 2 salas). Recompensas x0,7.': ['Weaker enemies. +0.5 enemies per new room (one more every 2 rooms). Rewards x0.7.', 'Ennemis plus faibles. +0,5 ennemi par nouvelle salle (un de plus toutes les 2 salles). Récompenses x0,7.'],
+    'La experiencia equilibrada. +1 enemigo por cada sala nueva. Recompensas x1.': ['The balanced experience. +1 enemy per new room. Rewards x1.', 'L\'expérience équilibrée. +1 ennemi par nouvelle salle. Récompenses x1.'],
+    'Enemigos con +45 % de vida y +50 % de daño. +2 enemigos por cada sala nueva. Tu vida no cambia. Recompensas x1,7.': ['Enemies with +45 % health and +50 % damage. +2 enemies per new room. Your health does not change. Rewards x1.7.', 'Ennemis avec +45 % de vie et +50 % de dégâts. +2 ennemis par nouvelle salle. Votre vie ne change pas. Récompenses x1,7.'],
     // --- mejoras permanentes ---
     'Núcleo reforzado': ['Reinforced Core', 'Noyau renforcé'], '+1 vida máxima': ['+1 max health', '+1 vie max'], 'Barrera latente': ['Latent Barrier', 'Barrière latente'], '+1 escudo': ['+1 shield', '+1 bouclier'],
     'Autorreparación': ['Self-repair', 'Auto-réparation'], 'El escudo se recarga antes': ['The shield recharges sooner', 'Le bouclier se recharge plus vite'], 'Compilador agresivo': ['Aggressive Compiler', 'Compilateur agressif'], '+10 % de daño': ['+10 % damage', '+10 % de dégâts'],
