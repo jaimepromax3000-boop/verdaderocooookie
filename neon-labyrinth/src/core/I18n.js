@@ -113,6 +113,7 @@ const I18n = {
     '[ Enter ]  Volver al menú': ['[ Enter ]  Back to menu', '[ Entrée ]  Retour au menu'], '[Enter / clic]  Continuar': ['[Enter / click]  Continue', '[Entrée / clic]  Continuer'],
     'Pierdes las mejoras de esta partida;': ['You lose this run\'s upgrades;', 'Vous perdez les améliorations de cette partie ;'], 'conservas fragmentos, monedas y misiones.': ['you keep fragments, coins and missions.', 'vous gardez fragments, pièces et missions.'],
     // --- temas, jefes, enemigos ---
+    'FÁBRICA DE ROBOTS': ['ROBOT FACTORY', 'USINE DE ROBOTS'], 'JUNGLA DIGITAL': ['DIGITAL JUNGLE', 'JUNGLE NUMÉRIQUE'], 'ARCHIVO OLVIDADO': ['FORGOTTEN ARCHIVE', 'ARCHIVE OUBLIÉE'], 'REACTOR': ['REACTOR', 'RÉACTEUR'], 'AURORA': ['AURORA', 'AURORE'], 'CORAZÓN DEL SISTEMA': ['HEART OF THE SYSTEM', 'CŒUR DU SYSTÈME'],
     'SERVIDORES': ['SERVERS', 'SERVEURS'], 'RED NEURONAL': ['NEURAL NETWORK', 'RÉSEAU NEURONAL'], 'NÚCLEO CENTRAL': ['CENTRAL CORE', 'NOYAU CENTRAL'], 'CIUDAD NEÓN': ['NEON CITY', 'VILLE NÉON'], 'OCÉANO DE DATOS': ['DATA OCEAN', 'OCÉAN DE DONNÉES'], 'EL VACÍO': ['THE VOID', 'LE VIDE'],
     'Guardián del Servidor': ['Server Guardian', 'Gardien du Serveur'], 'Hidra de Datos': ['Data Hydra', 'Hydre de Données'], 'Núcleo Corrupto': ['Corrupted Core', 'Noyau Corrompu'], 'Centinela Prisma': ['Prism Sentinel', 'Sentinelle Prisme'], 'Coloso de Hierro': ['Iron Colossus', 'Colosse de Fer'], 'Emperador del Vacío': ['Void Emperor', 'Empereur du Vide'],
     'Centinelas': ['Sentinels', 'Sentinelles'], 'Invocadores': ['Summoners', 'Invocateurs'], 'Francotiradores': ['Snipers', 'Tireurs d\'élite'], 'Blindados': ['Armored units', 'Blindés'], 'Bombas lógicas': ['Logic bombs', 'Bombes logiques'], 'Espectros': ['Specters', 'Spectres'], 'Fractales': ['Fractals', 'Fractals'], 'Torretas': ['Turrets', 'Tourelles'], 'Drones': ['Drones', 'Drones'],
@@ -131,7 +132,7 @@ const I18n = {
 
   /** Reglas con números y partes variables. tg = grupos que se traducen por separado. */
   R: [
-    [/^(.+) M[kK] II$/, '$1 Mk II', '$1 Mk II', [1]],
+    [/^(.+) M[kK] (II|III|IV|V)$/, '$1 Mk $2', '$1 Mk $2', [1]],
     [/^Elimina (\d+) enemigos$/, 'Defeat $1 enemies', 'Éliminez $1 ennemis'], [/^Elimina (\d+) élites$/, 'Defeat $1 elites', 'Éliminez $1 élites'],
     [/^Elimina (\d+) (.+)$/, 'Defeat $1 $2', 'Éliminez $1 $2', [2]],
     [/^Limpia (\d+) salas$/, 'Clear $1 rooms', 'Nettoyez $1 salles'], [/^Derrota a (\d+) jefes$/, 'Defeat $1 bosses', 'Battez $1 boss'],

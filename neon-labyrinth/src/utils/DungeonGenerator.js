@@ -39,8 +39,8 @@ class DungeonGenerator {
 
   generate(floor = 1) {
     const rng = this.rng;
-    const GRID = floor >= 4 ? 9 : 7, mid = GRID >> 1;                       // las plantas profundas son mayores
-    const target = rng.int(10, 15) + Math.min(8, Math.floor((floor - 1) * 0.9));
+    const GRID = floor < 4 ? 7 : floor < 10 ? 9 : floor < 18 ? 11 : 13, mid = GRID >> 1;   // las plantas profundas son mayores
+    const target = rng.int(10, 15) + Math.min(20, Math.floor((floor - 1) * 0.95));
     const rooms = new Map();
     const make = (gx, gy) => {
       const r = { gx, gy, type: 'combat', doors: { N: false, S: false, W: false, E: false }, locked: false,

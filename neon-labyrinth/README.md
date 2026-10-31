@@ -30,7 +30,7 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 ## Bucle de juego
 
 - Sala inicial segura: eliges arma inicial (Pulso, Dispersor, Lanza Riel).
-- **10 plantas** (de ~12 salas la primera a ~20 la última) con 6 biomas y 6 jefes distintos (los de las plantas 7-9 son versiones Mk II); las puertas se sellan al entrar y se abren al matar a todos los enemigos (algunas salas tienen 2 oleadas).
+- **25 plantas** (de 10-15 salas la primera a 30-35 la última) con 12 biomas y 6 jefes distintos que reaparecen en versiones Mk II a Mk V (la planta 25 es el jefe final); las puertas se sellan al entrar y se abren al matar a todos los enemigos (algunas salas tienen 2 oleadas).
 - **Al limpiar una sala eliges 1 de 3 mejoras temporales** aleatorias y distintas. Duran una partida y tienen niveles: escudos orbitales, cadencia de fuego (más disparos por segundo, luego doble y triple disparo), campo de fuerza, daño, nanobots, velocidad, esquiva, espinas, campo temporal... 31 en total.
 - **El jefe suelta un cofre** (Bronce / Plata / Oro según la planta y la dificultad) con monedas, fragmentos, mejoras permanentes o skins. Se abre con E.
 - Salas especiales: **Tienda** (mejoras temporales con créditos), **Tesoro** oculto (puerta con llave) y **Jefe** en el punto más lejano.

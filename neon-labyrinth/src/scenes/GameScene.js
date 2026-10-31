@@ -95,7 +95,7 @@ class GameScene extends Phaser.Scene {
   // ===================================================================================
   newFloor(n) {
     this.floor = n;
-    this.theme = THEMES[(n - 1) % THEMES.length];
+    this.theme = n >= CFG.FLOORS ? THEMES[THEMES.length - 1] : THEMES[(n - 1) % (THEMES.length - 1)];
     this.cameras.main.setBackgroundColor(this.theme.bg);
     this.bgGrid.setTint(this.theme.edge);
     const gen = new DungeonGenerator(this.seedBase + n * 977);
@@ -146,7 +146,7 @@ class GameScene extends Phaser.Scene {
     this.rebuildBlocked();
     this.drawDoors();
     this.buildExtras(room);
-    if (room.type === 'boss' && !room.cleared) Bus.emit('boss:intro', { name: BOSS_INFO[bossKindFor(this.floor)].name + (this.floor >= 7 ? ' Mk II' : '') });
+    if (room.type === 'boss' && !room.cleared) Bus.emit('boss:intro', { name: BOSS_INFO[bossKindFor(this.floor)].name + bossSuffix(this.floor) });
     Bus.emit('room:enter', { room });
   }
 
@@ -206,7 +206,7 @@ class GameScene extends Phaser.Scene {
     ][f <= 2 ? 0 : f <= 5 ? 1 : 2];
     const total = Object.values(W).reduce((a, b) => a + b, 0);
     let budget = room.waveBudget[wave - 1], spent = 0, n = 0, eliteDone = wave > 1;
-    const maxN = 10 + Math.floor(f / 3);
+    const maxN = Math.min(16, 10 + Math.floor(f / 3));
     while (n < maxN && (spent < budget || n < 2)) {
       let r = rng() * total, type = 'grunt';
       for (const [k, w] of Object.entries(W)) { if ((r -= w) <= 0) { type = k; break; } }
@@ -224,7 +224,7 @@ class GameScene extends Phaser.Scene {
 
   spawnEnemy(type, x, y, minion = false, elite = null) {
     const f = this.floor;
-    const scale = (type === 'boss' ? 1 + 0.4 * (f - 1) : 1 + 0.28 * (f - 1)) * this.diff.hp;
+    const scale = (type === 'boss' ? depthBossHp(f) : depthHp(f)) * this.diff.hp;
     let variant = null;
     if (type === 'shooter' && f >= 2) variant = this.rng() < 0.5 ? 'cryo' : (f >= 3 ? 'toxic' : null);
     const e = new Enemy(this, x, y, type, scale, variant, elite);
@@ -266,7 +266,7 @@ class GameScene extends Phaser.Scene {
     if (room.type === 'boss') {
       this.bossesKilled++;
       Meta.data.totals.bosses++; Missions.track('boss');
-      const tier = Math.max(1, Math.min(3, Math.ceil(this.floor / 3) + this.diff.chest));       // calidad del cofre: jefe + dificultad
+      const tier = Math.max(1, Math.min(3, Math.ceil(this.floor / 8) + this.diff.chest));       // calidad del cofre: jefe + dificultad
       this.addItem('chest', c.x - 60, c.y, { tier });
       this.addItem('portal', c.x + 60, c.y, {});
       this.floatText(c.x, c.y - 60, 'SERVIDOR PURGADO', 0x00f0ff);
@@ -499,8 +499,11 @@ class GameScene extends Phaser.Scene {
     return b;
   }
 
+  /** Daño base de lo que hacen los enemigos: dificultad x profundidad. */
+  enemyDmg() { return this.diff.dmg * depthDmg(this.floor); }
+
   fireEnemyBullet(x, y, angle, speed, color, status, size = 1) {
-    return this.fireBullet({ owner: 'enemy', damage: this.diff.dmg, speed, life: 3.2, pierce: 0, bounces: 0, size, color, homing: 0, tags: [], status }, x, y, angle);
+    return this.fireBullet({ owner: 'enemy', damage: this.enemyDmg(), speed, life: 3.2, pierce: 0, bounces: 0, size, color, homing: 0, tags: [], status }, x, y, angle);
   }
 
   updateBullets(dt) {
@@ -737,7 +740,7 @@ class GameScene extends Phaser.Scene {
     this.spawnBurst(x, y, color, 16);
     this.sfx('boom'); this.cameras.main.shake(150, 0.006);
     const p = this.player;
-    if (!p.dead && (p.x - x) ** 2 + (p.y - y) ** 2 < (radius + p.radius) ** 2) { if (p.takeDamage(dmg * this.diff.dmg, 'explosion')) p.knock(Math.atan2(p.y - y, p.x - x), 320); }
+    if (!p.dead && (p.x - x) ** 2 + (p.y - y) ** 2 < (radius + p.radius) ** 2) { if (p.takeDamage(dmg * this.enemyDmg(), 'explosion')) p.knock(Math.atan2(p.y - y, p.x - x), 320); }
   }
 
   ringFx(x, y, r, color) {
@@ -868,7 +871,7 @@ class GameScene extends Phaser.Scene {
       if (e.dead || e.spawnT > 0 || !e.contact) continue;
       if (e.type === 'grunt' && !e.charging && e.fsm.name !== 'chase') continue;
       if ((e.x - p.x) ** 2 + (e.y - p.y) ** 2 < (e.radius + p.radius) ** 2) {
-        if (p.takeDamage(this.diff.dmg, 'contact')) { p.knock(Math.atan2(p.y - e.y, p.x - e.x), 320); e.knock(Math.atan2(e.y - p.y, e.x - p.x), 120); }
+        if (p.takeDamage(this.enemyDmg(), 'contact')) { p.knock(Math.atan2(p.y - e.y, p.x - e.x), 320); e.knock(Math.atan2(e.y - p.y, e.x - p.x), 120); }
       }
     }
   }

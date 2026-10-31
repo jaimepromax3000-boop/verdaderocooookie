@@ -6,7 +6,7 @@ const CFG = {
   T: 32,                    // tamaño de baldosa
   RW: 30, RH: 17,           // baldosas por sala (960 x 544)
   OX: 32, OY: 64,           // desplazamiento de la sala en pantalla (arriba queda el HUD)
-  FLOORS: 10,               // plantas del servidor (la última tiene el jefe final)
+  FLOORS: 25,               // plantas del servidor (la última tiene el jefe final)
   COL: { cyan: 0x00f0ff, magenta: 0xff2bd6, yellow: 0xffe94d, green: 0x5dff8a, red: 0xff4466, orange: 0xff9a3c, violet: 0x9b5cff, white: 0xffffff },
 };
 
@@ -28,6 +28,12 @@ const THEMES = [
   { name: 'CIUDAD NEÓN',   floor: 0x06121a, grid: 0x0f3a4a, dot: 0x0b2a38, wall: 0x0a1e2a, edge: 0x00ffd0, edge2: 0xff2bd6, obs: 0x201030, obsEdge: 0x00ffd0, bg: 0x02080c, accent: 0x00ffd0 },
   { name: 'OCÉANO DE DATOS', floor: 0x04101c, grid: 0x0c3052, dot: 0x0a2640, wall: 0x081c34, edge: 0x3c8cff, edge2: 0x7fe9ff, obs: 0x0a1f3a, obsEdge: 0x5dff8a, bg: 0x020813, accent: 0x3c8cff },
   { name: 'EL VACÍO',      floor: 0x0a0a10, grid: 0x22224a, dot: 0x181838, wall: 0x12122a, edge: 0x9b5cff, edge2: 0xffe94d, obs: 0x1a1030, obsEdge: 0xffffff, bg: 0x040408, accent: 0xc9a6ff },
+  { name: 'FÁBRICA DE ROBOTS', floor: 0x0c0e12, grid: 0x2a3340, dot: 0x1e2630, wall: 0x161b24, edge: 0x8aa0c0, edge2: 0xff9a3c, obs: 0x241a10, obsEdge: 0xff9a3c, bg: 0x050608, accent: 0xff9a3c },
+  { name: 'JUNGLA DIGITAL', floor: 0x04120a, grid: 0x0f3a1c, dot: 0x0a2a14, wall: 0x082010, edge: 0x3cff7a, edge2: 0xffe94d, obs: 0x10281a, obsEdge: 0xb6ff3c, bg: 0x020a05, accent: 0x3cff7a },
+  { name: 'ARCHIVO OLVIDADO', floor: 0x120e06, grid: 0x3a2e14, dot: 0x2a200c, wall: 0x1e1708, edge: 0xd9a520, edge2: 0xfff2a8, obs: 0x2a2010, obsEdge: 0xffe94d, bg: 0x090703, accent: 0xd9a520 },
+  { name: 'REACTOR',       floor: 0x160606, grid: 0x421414, dot: 0x300e0e, wall: 0x260a0a, edge: 0xff4466, edge2: 0xffffff, obs: 0x2a0a10, obsEdge: 0xff4466, bg: 0x0a0202, accent: 0xff4466 },
+  { name: 'AURORA',        floor: 0x061416, grid: 0x14424a, dot: 0x0e3036, wall: 0x0a2228, edge: 0x3cf0c8, edge2: 0xc9a6ff, obs: 0x1a1a3a, obsEdge: 0x3cf0c8, bg: 0x020a0c, accent: 0x3cf0c8 },
+  { name: 'CORAZÓN DEL SISTEMA', floor: 0x10101a, grid: 0x3a3a5a, dot: 0x282842, wall: 0x1a1a2c, edge: 0xffd23c, edge2: 0xffffff, obs: 0x2a2440, obsEdge: 0xffd23c, bg: 0x06060c, accent: 0xffd23c },
 ];
 
 /** Armas básicas que se eligen en la sala segura al empezar cada incursión. */

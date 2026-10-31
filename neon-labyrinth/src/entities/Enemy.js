@@ -36,8 +36,14 @@ const BOSS_INFO = [
   { tex: 'enemy_boss6', name: 'Emperador del Vacío',   color: 0xffd23c, phases: 3 },
 ];
 /** Qué jefe aparece en cada planta (las plantas 7-9 repiten diseños en versión Mk II). */
-const BOSS_BY_FLOOR = [0, 1, 2, 3, 4, 5, 6, 1, 2, 4, 6];
-const bossKindFor = f => BOSS_BY_FLOOR[Math.max(1, Math.min(BOSS_BY_FLOOR.length - 1, f))];
+const bossKindFor = f => (f >= CFG.FLOORS ? 6 : f <= 6 ? f : ((f - 1) % 6) + 1);
+/** Versión del jefe: las plantas 7-12 son Mk II, 13-18 Mk III, 19-24 Mk IV y la última Mk V. */
+const bossSuffix = f => { const t = f >= CFG.FLOORS ? 5 : Math.floor((f - 1) / 6) + 1; return t > 1 ? ' Mk ' + ['', '', 'II', 'III', 'IV', 'V'][t] : ''; };
+/** Escalado de vida de enemigos con la profundidad (se suaviza a partir de la planta 10). */
+const depthHp = f => (f <= 10 ? 1 + 0.28 * (f - 1) : 1 + 0.28 * 9 + 0.17 * (f - 10));
+const depthBossHp = f => (f <= 10 ? 1 + 0.4 * (f - 1) : 1 + 0.4 * 9 + 0.22 * (f - 10));
+/** Daño enemigo extra en plantas profundas (1 hasta la 10). */
+const depthDmg = f => 1 + 0.03 * Math.max(0, f - 10);
 
 const BOSS_SEQ = {
   1: { 1: ['ring', 'charge', 'ring', 'charge'],                 2: ['spiral', 'summon', 'charge', 'ring'] },
@@ -64,7 +70,7 @@ class Enemy extends Entity {
     this.type = type;
     this.cfg = cfg;
     this.bossInfo = info;
-    this.bossName = info ? info.name + (scene.floor >= 7 ? ' Mk II' : '') : null;
+    this.bossName = info ? info.name + bossSuffix(scene.floor) : null;
     this.color = info ? info.color : cfg.color;
     this.elite = elite;
     this.variant = variant;                 // 'cryo' | 'toxic' | null (solo centinelas)
@@ -153,7 +159,7 @@ class Enemy extends Entity {
       if (od > 0 && od < this.radius + o.radius + 4) { vx += (ox / od) * 0.6; vy += (oy / od) * 0.6; }
     }
     const l = Math.hypot(vx, vy) || 1;
-    const sp = this.cfg.speed * (1 + 0.05 * (this.gs.floor - 1)) * speedMult * this.speedFactor() * this.eliteSpeed * this.gs.diff.speed;
+    const sp = this.cfg.speed * (1 + 0.05 * Math.min(12, this.gs.floor - 1)) * speedMult * this.speedFactor() * this.eliteSpeed * this.gs.diff.speed;
     this.move((vx / l) * sp * dt, (vy / l) * sp * dt);
     this.moveDir.set(vx / l, vy / l);
   }
@@ -271,7 +277,7 @@ class Enemy extends Entity {
         this.moveDir.set(Math.cos(this.aimAngle), Math.sin(this.aimAngle));
         if (t >= 0.95 && !this.attackStep) {
           this.attackStep = 1;
-          g.fireBullet({ owner: 'enemy', damage: g.diff.dmg, speed: 640, life: 1.6, pierce: 0, bounces: 0, size: 1.35, color: 0xb6ff3c, homing: 0, tags: [], status: null }, this.x, this.y, this.aimAngle);
+          g.fireBullet({ owner: 'enemy', damage: g.enemyDmg(), speed: 640, life: 1.6, pierce: 0, bounces: 0, size: 1.35, color: 0xb6ff3c, homing: 0, tags: [], status: null }, this.x, this.y, this.aimAngle);
           g.sfx('shoot');
         }
         if (t > 1.3) { this.attackCd = 2.6 + g.rng() * 0.8; fsm.set('chase'); }

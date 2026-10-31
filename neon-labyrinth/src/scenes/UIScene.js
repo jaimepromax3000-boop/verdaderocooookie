@@ -199,7 +199,7 @@ class UIScene extends Phaser.Scene {
   drawMap(game) {
     const g = this.gMap;
     g.clear();
-    const n = game.dungeon.size || 7, cell = n > 7 ? 12 : 15, gap = n > 7 ? 2 : 3, side = n * (cell + gap) + 6, ox = CFG.W - side - 6, oy = 70;
+    const n = game.dungeon.size || 7, cell = n <= 7 ? 15 : n <= 9 ? 12 : n <= 11 ? 10 : 8, gap = n <= 7 ? 3 : 2, side = n * (cell + gap) + 6, ox = CFG.W - side - 6, oy = 70;
     g.fillStyle(0x03050f, 0.6); g.fillRect(ox - 6, oy - 6, side, side);
     g.lineStyle(1, 0x2748ff, 0.8); g.strokeRect(ox - 6, oy - 6, side, side);
     this.paintMap(g, game, ox, oy, cell, gap, false);
@@ -211,8 +211,8 @@ class UIScene extends Phaser.Scene {
     g.clear();
     this.bigLabels.forEach(l => l.destroy()); this.bigLabels = [];
     if (!(this.keyTab.isDown || this.gs.touch.map) || this.overlay) return;
-    const W = CFG.W, H = CFG.H, nn = game.dungeon.size || 7, cell = nn > 7 ? 36 : 46, gap = nn > 7 ? 10 : 14, step = cell + gap, size = nn * step;
-    const ox = (W - size) / 2 + 20, oy = nn > 7 ? 92 : 105;
+    const W = CFG.W, H = CFG.H, nn = game.dungeon.size || 7, step = Math.floor(Math.min(60, 470 / nn)), cell = Math.round(step * 0.78), gap = step - cell, size = nn * step;
+    const ox = (W - size) / 2 + 20, oy = nn > 9 ? 88 : nn > 7 ? 92 : 105;
     g.fillStyle(0x02030a, 0.9); g.fillRect(0, 0, W, H);
     g.lineStyle(2, game.theme.accent, 0.7); g.strokeRect(ox - 20, oy - 20, size + 20, size + 4);
     this.paintMap(g, game, ox, oy, cell, gap, true);

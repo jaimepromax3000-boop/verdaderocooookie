@@ -82,7 +82,7 @@ const Missions = {
     elite: () => { const n = 2 + Math.floor(Math.random() * 3); return { target: n, text: `Elimina ${n} élites`, reward: { coins: 60 + n * 20, frag: 10 } }; },
     ability: () => { const n = 4 + Math.floor(Math.random() * 7); return { target: n, text: `Usa tu habilidad ${n} veces`, reward: { coins: 40 + n * 5 } }; },
     coins: () => { const n = 30 + 10 * Math.floor(Math.random() * 6); return { target: n, text: `Recoge ${n} créditos en partidas`, reward: { coins: 40 + n } }; },
-    floor: () => { const n = 2 + Math.floor(Math.random() * 5); return { target: n, text: `Llega a la planta ${n}`, reward: { coins: n * 50, frag: n * 8 } }; },
+    floor: () => { const n = 2 + Math.floor(Math.random() * 12); return { target: n, text: `Llega a la planta ${n}`, reward: { coins: n * 50, frag: n * 8 } }; },
     upgrade: () => { const n = 5 + Math.floor(Math.random() * 6); return { target: n, text: `Elige ${n} mejoras de sala`, reward: { coins: 40 + n * 6 } }; },
     win: () => { const diff = 1 + Math.floor(Math.random() * 2); return { target: 1, text: `Completa una partida en ${DIFFICULTIES[diff].name}`, extra: { diff }, reward: { frag: 40 * (diff + 1), chest: diff + 1 } }; },
   },
