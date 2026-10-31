@@ -66,11 +66,11 @@ class DungeonGenerator {
       const r = make(nx, ny);
       link(base, r, dirName);
     }
-    // algún bucle extra entre salas contiguas
+    // Toda sala contigua a otra se comunica con ella: si dos salas están pegadas, hay puerta entre ambas
     for (const r of rooms.values()) {
       for (const [name, d] of Object.entries(DIRS)) {
         const o = get(r.gx + d.dx, r.gy + d.dy);
-        if (o && !r.doors[name] && rng() < 0.08) link(r, o, name);
+        if (o && !r.doors[name]) link(r, o, name);
       }
     }
 
@@ -89,19 +89,17 @@ class DungeonGenerator {
     const degree = r => Object.values(r.doors).filter(Boolean).length;
     const all = Array.from(rooms.values());
 
-    // Jefe: el punto más alejado posible del origen (preferimos un callejón sin salida)
+    // Jefe: de las salas más alejadas del origen, la que tenga menos puertas
     const byDist = all.filter(r => r !== start).sort((a, b) => b.dist - a.dist);
-    const boss = byDist.find(r => degree(r) === 1) || byDist[0];
+    const far = byDist.filter(r => r.dist >= byDist[0].dist - 1);
+    const boss = far.sort((a, b) => degree(a) - degree(b) || b.dist - a.dist)[0];
     boss.type = 'boss';
 
-    // Tienda y tesoro: callejones restantes; si faltan, las salas más lejanas con pocas puertas
-    let spare = all.filter(r => r.type === 'combat' && degree(r) === 1);
-    if (spare.length < 2) spare = spare.concat(all.filter(r => r.type === 'combat' && degree(r) === 2 && !spare.includes(r)));
-    rng.shuffle(spare);
-    const shop = spare.find(r => r.dist >= 2) || spare[0];
+    // Tienda y tesoro: las salas con menos puertas (rincones); la tienda no pegada al inicio, el tesoro lo más lejos posible
+    const cand = rng.shuffle(all.filter(r => r.type === 'combat')).sort((a, b) => degree(a) - degree(b));
+    const shop = cand.find(r => r.dist >= 2) || cand[0];
     if (shop) shop.type = 'shop';
-    const treasure = spare.filter(r => r !== shop).sort((a, b) => b.dist - a.dist)[0]
-      || all.filter(r => r.type === 'combat').sort((a, b) => b.dist - a.dist)[0];
+    const treasure = cand.filter(r => r !== shop && r.type === 'combat').sort((a, b) => degree(a) - degree(b) || b.dist - a.dist)[0];
     if (treasure) { treasure.type = 'treasure'; treasure.locked = true; }
 
     for (const r of all) r.layout = this.makeLayout(r);
