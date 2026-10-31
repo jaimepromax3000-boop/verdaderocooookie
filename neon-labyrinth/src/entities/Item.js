@@ -5,7 +5,7 @@
  */
 class Item extends Phaser.GameObjects.Sprite {
   constructor(scene, x, y, kind, data = {}) {
-    super(scene, x, y, kind === 'chest' ? 'chest_' + (data.tier || 1) : Item.textureFor(kind));
+    super(scene, x, y, kind === 'chest' ? 'chestb_' + (data.tier || 1) : Item.textureFor(kind));
     this.fx = [];
     scene.add.existing(this);
     this.gs = scene;
@@ -20,11 +20,20 @@ class Item extends Phaser.GameObjects.Sprite {
     const tint = Item.tintFor(kind, data);
     if (tint !== null) this.setTint(tint);
     if (kind === 'module' || kind === 'weapon') this.setScale(1.2);
-    if (kind === 'chest') this.setScale(1.3);
+    if (kind === 'chest') {                                         // cofre virtual: base + tapa + resplandor + anillo holográfico
+      const tier = data.tier || 1, bs = Art.scaleOf(this.texture.key), col = CHEST_TIERS[tier - 1].color;
+      this.setScale(1.2 * bs).setDepth(6);
+      this.lid = scene.add.image(x, y - 21, 'chestl_' + tier).setScale(1.2 * bs).setDepth(7);
+      const glow = scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(col).setScale(2.6).setDepth(5).setAlpha(0.5);
+      const ring = scene.add.image(x, y + 14, 'holo_ring').setBlendMode(Phaser.BlendModes.ADD).setScale(1.7 * bs * 2, 0.7 * bs * 2).setDepth(5).setAlpha(0.8);
+      this.fx.push(this.lid, glow, ring); this.glowFx = glow; this.ringFx = ring;
+    }
     if (kind === 'generator') this.setScale(1.35 * Art.scaleOf(this.texture.key));
-    if (kind === 'portal') {                                       // vórtice animado con resplandor
-      this.setScale(1.05 * Art.scaleOf(this.texture.key)).setDepth(6);
-      this.fx.push(scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0x00f0ff).setScale(3.2).setDepth(4).setAlpha(0.6));
+    if (kind === 'portal') {                                       // vórtice animado con resplandor (el del jefe es grande)
+      const big = !!data.big;
+      this.enterR = big ? 54 : 30;
+      this.setScale((big ? 2.0 : 1.05) * Art.scaleOf(this.texture.key)).setDepth(6);
+      this.fx.push(scene.add.image(x, y, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0x00f0ff).setScale(big ? 6.6 : 3.2).setDepth(4).setAlpha(0.6));
     }
     if (kind === 'module' || kind === 'weapon' || kind === 'chest' || kind === 'generator' || this.price) {
       const name = kind === 'generator' ? 'Generador de portal\n[T] activar' : kind === 'chest' ? `Cofre de ${CHEST_TIERS[(data.tier || 1) - 1].name}\n[E] abrir` : kind === 'module' ? Modules.defs[data.id].name : kind === 'weapon' ? WEAPONS[data.id].name : kind === 'heart' ? 'Reparación' : kind === 'key' ? 'Llave' : '';
@@ -51,6 +60,13 @@ class Item extends Phaser.GameObjects.Sprite {
     this.t += dt;
     this.y = this.baseY + Math.sin(this.t * 3) * 2.5;
     if (this.kind === 'portal') { this.setRotation(this.t * 1.5); this.fx.forEach(f => f.setPosition(this.x, this.baseY).setAlpha(0.45 + 0.2 * Math.sin(this.t * 4))); }
+    if (this.kind === 'chest' && !this.opening) {
+      this.lid.setPosition(this.x, this.y - 21);
+      this.glowFx.setPosition(this.x, this.baseY).setAlpha(0.35 + 0.2 * Math.sin(this.t * 3));
+      this.ringFx.setPosition(this.x, this.baseY + 14);
+      this.ringFx.setAlpha(0.55 + 0.3 * Math.sin(this.t * 4));
+      if (Math.random() < 0.02) { this.setAlpha(0.7); this.scene.time.delayedCall(60, () => { if (this.active) this.setAlpha(1); }); }   // parpadeo de glitch
+    }
     if (this.label) this.label.setPosition(this.x, this.baseY + 24);
   }
 

@@ -7,7 +7,11 @@
  */
 class Player extends Entity {
   constructor(scene, x, y, character, weaponId, skinId = 'operator') {
-    super(scene, x, y, Art.playerKey(scene, skinId), 11, 1);
+    const parts = Art.playerParts(scene, skinId);
+    super(scene, x, y, parts.upper, 11, 1);
+    this.parts = parts;
+    this.legImg = scene.add.image(x, y, parts.idle).setDepth(19.5).setScale(Art.scaleOf(parts.idle));       // piernas animadas
+    this.legRot = 0; this.stepT = 0;
     this.wpImg = scene.add.image(x, y, character.wp).setDepth(21);
     this.character = character;
     this.baseTint = 0xffffff;                           // la nave ya trae sus colores
@@ -59,6 +63,7 @@ class Player extends Entity {
   destroy(fromScene) {
     if (this.glowImg) { this.glowImg.destroy(); this.glowImg = null; }
     if (this.wpImg) { this.wpImg.destroy(); this.wpImg = null; }
+    if (this.legImg) { this.legImg.destroy(); this.legImg = null; }
     super.destroy(fromScene);
   }
 
@@ -255,6 +260,14 @@ class Player extends Entity {
     }
     this.updateOrbiters(dt);
     this.glowImg.setPosition(this.x, this.y).setAlpha(0.35 + 0.1 * Math.sin(this.gs.time.now / 180));
+    const moving = (dir.x || dir.y) && this.dashT <= 0 && !this.gs.travelling;                                  // animación de andar
+    if (moving) this.stepT += dt * (1 + 0.4 * (this.speedMult() - 1)); else this.stepT = 0;
+    const frame = moving ? (Math.floor(this.stepT / 0.13) % 2 ? this.parts.a : this.parts.b) : this.parts.idle;
+    this.legImg.setTexture(frame).setPosition(this.x, this.y);
+    if (moving) this.legRot = Phaser.Math.Angle.RotateTo(this.legRot, Math.atan2(dir.y, dir.x) + Math.PI / 2, 0.25);
+    else this.legRot = Phaser.Math.Angle.RotateTo(this.legRot, this.aimAngle + Math.PI / 2, 0.15);
+    this.legImg.setRotation(this.legRot);
+    if (moving) this.setRotation(this.aimAngle + Math.PI / 2 + 0.07 * Math.sin(this.stepT * 24));                   // balanceo de hombros
     const mz = this.muzzle();
     this.recoil = Math.max(0, (this.recoil || 0) - dt * 9);
     const rc = (this.recoil || 0) * 3;                    // pequeño retroceso al disparar
@@ -280,7 +293,7 @@ class Player extends Entity {
 
     // parpadeo mientras es invulnerable
     const al = this.phaseT > 0 ? 0.35 : this.iframes > 0 ? 0.45 + 0.35 * Math.sin(this.gs.time.now / 40) : 1;
-    this.setAlpha(al); this.wpImg.setAlpha(al);
+    this.setAlpha(al); this.wpImg.setAlpha(al); this.legImg.setAlpha(al);
   }
 
   takeDamage(amount, source, info) {
@@ -310,7 +323,7 @@ class Player extends Entity {
     if (this.dead) return;
     this.dead = true;
     this.setVisible(false);
-    this.glowImg.setVisible(false); this.wpImg.setVisible(false);
+    this.glowImg.setVisible(false); this.wpImg.setVisible(false); this.legImg.setVisible(false);
     this.orbiters.forEach(o => o.sprite.destroy()); this.orbiters = [];
     this.gs.spawnBurst(this.x, this.y, this.character.color, 30);
     Bus.emit('player:dead', {});

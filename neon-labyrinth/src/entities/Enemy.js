@@ -22,6 +22,11 @@ const ENEMY_TYPES = {
   blinker:  { tex: 'enemy_blinker',  hp: 4,  speed: 62,  r: 12, contact: 0, range: 330, name: 'Espectro',       color: 0x3cf0c8 },
   splitter: { tex: 'enemy_splitter', hp: 6,  speed: 76,  r: 14, contact: 1, range: 0,   name: 'Fractal',        color: 0x7dff3c },
   splitlet: { tex: 'enemy_splitter', hp: 2,  speed: 120, r: 8,  contact: 1, range: 0,   name: 'Fragmento',      color: 0x7dff3c, scale: 0.58 },
+  shielder: { tex: 'enemy_shielder', hp: 9,  speed: 56,  r: 15, contact: 1, range: 150, name: 'Escudero',       color: 0x6aa8ff },
+  mortar:   { tex: 'enemy_mortar',   hp: 5,  speed: 40,  r: 14, contact: 0, range: 470, name: 'Mortero',        color: 0xff8a3c },
+  spinner:  { tex: 'enemy_spinner',  hp: 8,  speed: 34,  r: 15, contact: 0, range: 360, name: 'Giróscopo',      color: 0xc65cff },
+  dasher:   { tex: 'enemy_dasher',   hp: 3,  speed: 100, r: 11, contact: 1, range: 190, name: 'Embestidor',     color: 0xff5c8a },
+  healer:   { tex: 'enemy_healer',   hp: 5,  speed: 60,  r: 12, contact: 0, range: 300, name: 'Reparador',      color: 0x5dff8a },
   boss:     { tex: 'enemy_boss1',    hp: 80, speed: 62,  r: 30, contact: 1, range: 330, name: 'Guardián',       color: 0xff2bd6 },
 };
 
@@ -41,7 +46,7 @@ const bossKindFor = f => (f >= CFG.FLOORS ? 6 : f <= 6 ? f : ((f - 1) % 6) + 1);
 const bossSuffix = f => { const t = f >= CFG.FLOORS ? 5 : Math.floor((f - 1) / 6) + 1; return t > 1 ? ' Mk ' + ['', '', 'II', 'III', 'IV', 'V'][t] : ''; };
 /** Escalado de vida de enemigos con la profundidad (se suaviza a partir de la planta 10). */
 const depthHp = f => (f <= 10 ? 1 + 0.28 * (f - 1) : 1 + 0.28 * 9 + 0.17 * (f - 10));
-const depthBossHp = f => (f <= 10 ? 1 + 0.4 * (f - 1) : 1 + 0.4 * 9 + 0.22 * (f - 10));
+const depthBossHp = f => (f <= 10 ? 1 + 0.5 * (f - 1) : 1 + 0.5 * 9 + 0.28 * (f - 10));
 /** Daño enemigo extra en plantas profundas (1 hasta la 10). */
 const depthDmg = f => 1 + 0.03 * Math.max(0, f - 10);
 
@@ -86,6 +91,7 @@ class Enemy extends Entity {
     if (cfg.scale) this.setScale(cfg.scale * bs);
     if (elite) this.setScale((cfg.scale || 1) * 1.25 * bs);
     this.setAlpha(0.3);
+    this.baseS = this.scaleX; this.seed = Math.random() * 6.28;          // animación de reposo (latido)
     this.patrolTarget = null;
     this.aiming = 0;
     this.phase = 1;
@@ -118,7 +124,7 @@ class Enemy extends Entity {
       .add('attack', {
         enter() { this.attackTime = 0; this.attackStep = 0; this.beginAttack(); },
         update(fsm, dt) { this.attackTime += dt; this.attackUpdate(fsm, dt); },
-        exit() { this.charging = false; this.telegraph = null; this.setTint(this.statusTint()); },
+        exit() { this.charging = false; this.telegraph = null; this.mortarTarget = null; this.setTint(this.statusTint()); },
       });
     this.fsm.set(type === 'turret' || type === 'boss' ? 'chase' : 'patrol');
   }
@@ -188,7 +194,7 @@ class Enemy extends Entity {
 
   chaseUpdate(fsm, dt) {
     const p = this.gs.player;
-    this.attackCd -= dt;
+    this.attackCd -= dt * this.gs.attackRate();
     const dist = Math.hypot(p.x - this.x, p.y - this.y);
     const sees = this.canSeePlayer(this.type === 'sniper' ? 620 : 520);
     const range = this.cfg.range;
@@ -207,13 +213,14 @@ class Enemy extends Entity {
     this.lostT = sees ? 0 : this.lostT + dt;
     if (this.lostT > 3.5) { fsm.set('patrol'); return; }
 
-    if (this.type === 'shooter' || this.type === 'summoner' || this.type === 'sniper' || this.type === 'blinker') {
-      const keep = this.type === 'sniper' ? 0.78 : this.type === 'blinker' ? 0.5 : 0.6;
+    if (['shooter', 'summoner', 'sniper', 'blinker', 'mortar', 'spinner', 'healer'].includes(this.type)) {
+      const keep = this.type === 'sniper' ? 0.78 : this.type === 'blinker' ? 0.5 : this.type === 'spinner' ? 0.45 : this.type === 'healer' ? 0.8 : 0.6;
       if (sees && dist < range * keep) {                // mantiene la distancia: se aleja del jugador
         this.steer(this.x - (p.x - this.x), this.y - (p.y - this.y), 0.85, dt);
       } else if (!sees || dist > range * 0.9) {
         this.followPath(dt);
       }
+      if (this.type === 'healer') { if (this.attackCd <= 0 && this.woundedAllies().length) fsm.set('attack'); return; }
       if (sees && dist < range && this.attackCd <= 0) fsm.set('attack');
       return;
     }
@@ -223,7 +230,12 @@ class Enemy extends Entity {
       return;
     }
     this.followPath(dt);
-    if ((this.type === 'grunt' || this.type === 'tank') && sees && dist < range && this.attackCd <= 0) fsm.set('attack');
+    if (['grunt', 'tank', 'shielder', 'dasher'].includes(this.type) && sees && dist < range && this.attackCd <= 0) fsm.set('attack');
+  }
+
+  /** Aliados heridos dentro del alcance de curación (para el Reparador). */
+  woundedAllies() {
+    return this.gs.enemies.filter(o => o !== this && !o.dead && o.spawnT <= 0 && o.type !== 'healer' && o.hp < o.maxHp * 0.95 && (o.x - this.x) ** 2 + (o.y - this.y) ** 2 < 190 * 190);
   }
 
   // ---------- ataques ----------
@@ -239,6 +251,7 @@ class Enemy extends Entity {
   attackUpdate(fsm, dt) {
     const g = this.gs, p = g.player, t = this.attackTime;
     switch (this.type) {
+      case 'shielder':
       case 'grunt': {                                    // embestida: aviso -> carga -> descanso
         if (t < 0.5) { this.setTint(Math.floor(t * 20) % 2 ? 0xff4466 : 0xffffff); this.aimAngle = Math.atan2(p.y - this.y, p.x - this.x); }
         else if (t < 1.0) {
@@ -292,6 +305,48 @@ class Enemy extends Entity {
           g.cameras.main.shake(140, 0.005);
         }
         if (t > 1.3) { this.attackCd = 3.0; fsm.set('chase'); }
+        break;
+      }
+      case 'dasher': {                                   // tres embestidas rápidas con aviso
+        const k = Math.floor(t / 0.62), tt = t - k * 0.62;
+        if (k >= 3) { this.charging = false; this.telegraph = null; this.attackCd = 2.4; fsm.set('chase'); break; }
+        if (tt < 0.3) { this.aimAngle = Math.atan2(p.y - this.y, p.x - this.x); this.telegraph = this.aimAngle; this.charging = false; this.setTint(Math.floor(tt * 30) % 2 ? 0xffffff : 0xff5c8a); }
+        else { this.telegraph = null; this.charging = true; this.move(Math.cos(this.aimAngle) * 520 * dt, Math.sin(this.aimAngle) * 520 * dt); g.afterimage(this); }
+        break;
+      }
+      case 'mortar': {                                   // marca una zona en el suelo y cae un proyectil
+        if (!this.mortarTarget) this.mortarTarget = { x: p.x, y: p.y };
+        const pr = Math.min(1, t / 1.15);
+        this.setTint(Math.floor(t * 12) % 2 ? 0xffd2a0 : 0xffffff);
+        if (t > 0.85 && !this.attackStep) {
+          this.attackStep = 1;
+          const sh = g.add.image(this.mortarTarget.x, this.mortarTarget.y - 280, 'ebullet').setTint(0xff8a3c).setScale(1.6).setDepth(31).setBlendMode(Phaser.BlendModes.ADD);
+          g.tweens.add({ targets: sh, y: this.mortarTarget.y, duration: 300, ease: 'Quad.easeIn', onComplete: () => sh.destroy() });
+        }
+        if (t >= 1.15) { g.enemyExplosion(this.mortarTarget.x, this.mortarTarget.y, 66, 1.4, 0xff8a3c); this.mortarTarget = null; this.attackCd = 3.4; fsm.set('chase'); }
+        break;
+      }
+      case 'spinner': {                                  // pulverizador giratorio de 3 brazos
+        const n = Math.floor(t / 0.09);
+        while (this.attackStep < n && this.attackStep < 26) {
+          for (let k = 0; k < 3; k++) g.fireEnemyBullet(this.x, this.y, this.attackStep * 0.42 + k * 2.094, 185, 0xc65cff, null);
+          this.attackStep++;
+        }
+        this.setRotation(t * 9);
+        if (t > 2.5) { this.attackCd = 3.2; fsm.set('chase'); }
+        break;
+      }
+      case 'healer': {                                   // cura a los aliados heridos cercanos
+        this.setTint(Math.floor(t * 14) % 2 ? 0x9fffc0 : 0xffffff);
+        if (t > 0.5 && !this.attackStep) {
+          this.attackStep = 1;
+          g.ringFx(this.x, this.y, 170, 0x5dff8a);
+          for (const a of this.woundedAllies()) {
+            a.hp = Math.min(a.maxHp, a.hp + a.maxHp * (a.type === 'boss' ? 0.04 : 0.3));
+            g.spawnLightning(this.x, this.y, a.x, a.y, 0x5dff8a); g.spawnBurst(a.x, a.y, 0x5dff8a, 8); g.floatText(a.x, a.y - a.radius - 14, '+', 0x5dff8a);
+          }
+        }
+        if (t > 0.9) { this.attackCd = 2.6; fsm.set('chase'); }
         break;
       }
       case 'bomber': {                                   // cuenta atrás y explota
@@ -455,12 +510,17 @@ class Enemy extends Entity {
       if (!this.fsm.is('chase')) this.fsm.set('chase');
       return;
     }
+    if (this.type === 'boss' && !this.hordeDone) {                                  // al empezar la pelea llama a su primera horda
+      this.hordeDone = true;
+      this.gs.time.delayedCall(900, () => { if (!this.dead && this.active) this.gs.bossHorde(this, 1); });
+    }
     if (this.type === 'boss') {
       const frac = this.hp / this.maxHp, maxPh = this.bossInfo.phases;
       const want = maxPh === 3 && frac < 0.33 ? 3 : frac < (maxPh === 3 ? 0.66 : 0.5) ? 2 : 1;
       if (want > this.phase) {
         this.phase = want; this.pattern = 0;
         this.gs.floatText(this.x, this.y - 50, 'FASE ' + want, this.color);
+        this.gs.time.delayedCall(700, () => { if (!this.dead && this.active) this.gs.bossHorde(this, 0.5); });         // refuerzos al cambiar de fase
         this.gs.spawnBurst(this.x, this.y, this.color, 30);
         this.gs.cameras.main.shake(320, 0.01);
         Bus.emit('boss:phase', { phase: want, name: this.bossInfo.name });
@@ -468,13 +528,18 @@ class Enemy extends Entity {
     }
     this.fsm.update(dt);
     if (this.dead) return;
+    this.setScale(this.baseS * (1 + (this.type === 'boss' ? 0.015 : 0.035) * Math.sin(this.gs.time.now / (this.type === 'boss' ? 420 : 210) + this.seed)));
     if (this.type === 'turret') this.setRotation(Math.atan2(this.moveDir.y, this.moveDir.x) + Math.PI / 2);
-    else this.setRotation(this.type === 'grunt' || this.type === 'splitter' || this.type === 'splitlet' || this.type === 'bomber' ? this.gs.time.now / 400 : Math.atan2(this.moveDir.y, this.moveDir.x) + Math.PI / 2);
+    else this.setRotation(this.type === 'grunt' || this.type === 'splitter' || this.type === 'splitlet' || this.type === 'bomber' || (this.type === 'spinner' && !this.fsm.is('attack')) ? this.gs.time.now / (this.type === 'spinner' ? 250 : 400) : Math.atan2(this.moveDir.y, this.moveDir.x) + Math.PI / 2);
   }
 
   takeDamage(amount, source, info) {
     if (this.spawnT > 0 || this.dead) return false;
     if (this.elite === 'armored') amount *= 0.55;
+    if (this.type === 'shielder' && info && info.dir !== undefined) {                 // el escudo detiene lo que llega de frente
+      const face = Math.atan2(this.moveDir.y, this.moveDir.x), diff = Math.abs(Phaser.Math.Angle.Wrap(info.dir + Math.PI - face));
+      if (diff < 1.15) { amount *= 0.15; this.gs.spark(this.x + Math.cos(face) * this.radius, this.y + Math.sin(face) * this.radius, 0x9fd0ff, 1.5); }
+    }
     const r = super.takeDamage(amount, source, info);
     if (!this.dead && this.fsm.is('patrol')) this.fsm.set('chase');
     return r;
@@ -497,6 +562,7 @@ class Enemy extends Entity {
     if (this.type === 'splitter') {                       // se parte en dos fragmentos (antes de avisar de la baja)
       for (let i = 0; i < 2; i++) g.spawnEnemy('splitlet', this.x + (i ? 14 : -14), this.y + (i ? 6 : -6), true).spawnT = 0.3;
     }
+    if (!this.minion || this.elite) g.shatter(this, this.elite ? 4 : 2, this.elite ? 0.5 : 0.35);       // se rompe en trozos
     Bus.emit('enemy:killed', { enemy: this });
     this.destroy();
   }

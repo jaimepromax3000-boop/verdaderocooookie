@@ -55,11 +55,14 @@ const Art = {
   // ================================================================== ENEMIGOS
   build(scene) {
     this.enemies(scene);
+    this.enemies2(scene);
     this.bosses(scene);
     this.skins(scene);
     this.items(scene);
     this.smith(scene);
     this.portal(scene);
+    this.chests(scene);
+    this.workshop(scene);
   },
 
   spike(c, cx, cy, ang, r0, r1, w, base, tip) {

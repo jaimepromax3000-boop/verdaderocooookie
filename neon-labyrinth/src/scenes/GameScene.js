@@ -3,6 +3,18 @@
  * los enemigos, los proyectiles (ObjectPool), las zonas de fuego, las recompensas, la tienda y el fin de la partida.
  * La interfaz vive en UIScene (otra escena en paralelo) y se comunica por el EventBus.
  */
+/** Tablas de aparición por tramos de profundidad (más variedad y más peligro cuanto más abajo). */
+const SPAWN_TABLES = [
+  { grunt: 40, shooter: 30, bomber: 12, splitter: 10, turret: 8 },
+  { grunt: 20, shooter: 16, summoner: 8, sniper: 10, bomber: 9, splitter: 9, tank: 7, blinker: 9, dasher: 8, shielder: 6 },
+  { grunt: 10, shooter: 12, summoner: 9, sniper: 10, bomber: 8, splitter: 8, tank: 11, blinker: 10, turret: 5, dasher: 8, shielder: 9, mortar: 8, healer: 6, spinner: 6 },
+  { grunt: 6, shooter: 9, summoner: 8, sniper: 10, bomber: 7, splitter: 7, tank: 12, blinker: 10, turret: 5, dasher: 8, shielder: 11, mortar: 10, healer: 8, spinner: 9 },
+  { grunt: 4, shooter: 8, summoner: 8, sniper: 10, bomber: 6, splitter: 6, tank: 13, blinker: 10, turret: 5, dasher: 8, shielder: 12, mortar: 12, healer: 9, spinner: 11 },
+];
+const SPAWN_COST = { grunt: 1, shooter: 1, bomber: 0.8, splitter: 1.4, turret: 1.5, summoner: 2, sniper: 1.6, tank: 3, blinker: 1.6, dasher: 1.3, shielder: 2.4, mortar: 2, healer: 1.8, spinner: 2.2 };
+const spawnTier = f => (f <= 2 ? 0 : f <= 5 ? 1 : f <= 12 ? 2 : f <= 20 ? 3 : 4);
+const ELITE_TYPES = ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker', 'dasher', 'shielder'];
+
 class GameScene extends Phaser.Scene {
   constructor() { super('GameScene'); }
 
@@ -71,9 +83,8 @@ class GameScene extends Phaser.Scene {
 
     this.keyE = this.input.keyboard.addKey('E');
     this.keyEsc = this.input.keyboard.addKey('ESC');
-    this.keyT = this.input.keyboard.addKey('T');                    // activa el generador de portal
     this.travelling = false; this.slowmo = 1;
-    this.touch = { mx: 0, my: 0, ax: 0, ay: 0, dash: false, ability: false, interact: false, portal: false, pause: false, map: false };   // controles táctiles
+    this.touch = { mx: 0, my: 0, ax: 0, ay: 0, dash: false, ability: false, interact: false, pause: false, map: false };   // controles táctiles
     this.input.mouse && this.input.mouse.disableContextMenu();
 
     this.scene.launch('UIScene', { game: this });
@@ -189,9 +200,9 @@ class GameScene extends Phaser.Scene {
         break;
       default: {
         const budget = (4 + f * 1.4 + room.dist * 0.35 + rng() * 2) * this.diff.count;
-        room.wavesTotal = budget > 7.5 ? 2 : 1;
+        room.wavesTotal = budget > 22 ? 3 : budget > 7.5 ? 2 : 1;                   // las salas profundas tienen hasta 3 oleadas
         room.wave = 1;
-        room.waveBudget = room.wavesTotal === 2 ? [budget * 0.55, budget * 0.5] : [budget];
+        room.waveBudget = room.wavesTotal === 3 ? [budget * 0.42, budget * 0.36, budget * 0.3] : room.wavesTotal === 2 ? [budget * 0.55, budget * 0.5] : [budget];
         this.spawnWave(room, 1);
       }
     }
@@ -200,15 +211,11 @@ class GameScene extends Phaser.Scene {
   /** Genera una oleada de la sala con un presupuesto de "coste" y una tabla de pesos por planta. */
   spawnWave(room, wave) {
     const f = this.floor, rng = this.rng;
-    const COST = { grunt: 1, shooter: 1, bomber: 0.8, splitter: 1.4, turret: 1.5, summoner: 2, sniper: 1.6, tank: 3, blinker: 1.6 };
-    const W = [
-      { grunt: 40, shooter: 30, bomber: 12, splitter: 10, turret: 8 },
-      { grunt: 22, shooter: 18, summoner: 10, sniper: 12, bomber: 10, splitter: 10, tank: 8, blinker: 10 },
-      { grunt: 12, shooter: 14, summoner: 10, sniper: 12, bomber: 10, splitter: 10, tank: 14, blinker: 12, turret: 6 },
-    ][f <= 2 ? 0 : f <= 5 ? 1 : 2];
+    const COST = SPAWN_COST, W = SPAWN_TABLES[spawnTier(f)];
     const total = Object.values(W).reduce((a, b) => a + b, 0);
-    let budget = room.waveBudget[wave - 1], spent = 0, n = 0, eliteDone = wave > 1;
-    const maxN = Math.min(16, 10 + Math.floor(f / 3));
+    let budget = room.waveBudget[wave - 1], spent = 0, n = 0;
+    let eliteLeft = (wave === 1 ? 1 : (f >= 6 ? 1 : 0)) + (f >= 10 ? 1 : 0) + (f >= 18 ? 1 : 0);     // más élites por sala cuanto más profundo
+    const maxN = Math.min(22, 10 + Math.floor(f / 2));
     while (n < maxN && (spent < budget || n < 2)) {
       let r = rng() * total, type = 'grunt';
       for (const [k, w] of Object.entries(W)) { if ((r -= w) <= 0) { type = k; break; } }
@@ -216,8 +223,8 @@ class GameScene extends Phaser.Scene {
       spent += COST[type]; n++;
       const p = this.randomFreePoint(14, type === 'turret' ? 110 : 150);
       let elite = null;
-      if (!eliteDone && room.dist >= 2 && ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker'].includes(type) && rng() < Math.min(0.42, 0.1 + 0.035 * (f - 1)) * this.diff.elite) {
-        elite = rng.pick(['fast', 'volatile', 'armored']); eliteDone = true;
+      if (eliteLeft > 0 && room.dist >= 2 && ELITE_TYPES.includes(type) && rng() < Math.min(0.6, 0.1 + 0.04 * (f - 1)) * this.diff.elite) {
+        elite = rng.pick(['fast', 'volatile', 'armored']); eliteLeft--;
       }
       this.spawnEnemy(type, p.x, p.y, false, elite);
     }
@@ -241,9 +248,9 @@ class GameScene extends Phaser.Scene {
     if (!this.room) return;
     // créditos sueltos con cierta probabilidad
     if (!e.minion && this.rng() < 0.4 + 0.1 * this.player.luck) this.addItem('coin', e.x, e.y, {});
-    if (e.elite) {                                              // los élites sueltan botín extra
+    if (e.elite && !e.minion) {                                 // los élites sueltan botín extra (y, con poca probabilidad, un corazón o una llave)
       for (let i = 0; i < 3; i++) this.addItem('coin', e.x + (this.rng() - 0.5) * 40, e.y + (this.rng() - 0.5) * 40, {});
-      if (this.rng() < 0.45) this.addItem('heart', e.x, e.y, {});
+      if (this.rng() < 0.18 + 0.04 * this.player.luck) this.addItem(this.rng() < 0.55 ? 'heart' : 'key', e.x, e.y, {});
       this.floatText(e.x, e.y - 24, 'ÉLITE ELIMINADO', ELITE_AFFIX[e.elite].color);
     }
     if (this.sealed && !this.enemies.some(x => !x.dead)) {
@@ -263,14 +270,14 @@ class GameScene extends Phaser.Scene {
     this.rebuildBlocked();
     this.drawDoors();
     this.sfx('open');
+    if (room.type === 'combat' && this.bossUnlocked()) Bus.emit('boss:unlocked', {});
     this.clearHazards();
     const c = this.roomCenter();
     if (room.type === 'boss') {
       this.bossesKilled++;
       Meta.data.totals.bosses++; Missions.track('boss');
       const tier = Math.max(1, Math.min(3, Math.ceil(this.floor / 8) + this.diff.chest));       // calidad del cofre: jefe + dificultad
-      this.addItem('chest', c.x - 60, c.y, { tier });
-      this.dropGenerator(c.x + 70, c.y);
+      this.dropBossLoot((this.bossDeathPos || c).x, (this.bossDeathPos || c).y, tier);
       this.floatText(c.x, c.y - 60, 'SERVIDOR PURGADO', 0x00f0ff);
       this.cameras.main.flash(300, 0, 240, 255);
     } else {
@@ -304,7 +311,7 @@ class GameScene extends Phaser.Scene {
     for (const [name, open] of Object.entries(room.doors)) {
       if (!open) continue;
       const locked = !!this.lockedDoors[DungeonGenerator.key(room.gx, room.gy) + ':' + name];
-      if (this.sealed || locked) for (const [x, y] of DOOR_TILES[name]) this.blocked[y * RW + x] = 1;
+      if (this.sealed || locked || this.doorToBoss(room, name)) for (const [x, y] of DOOR_TILES[name]) this.blocked[y * RW + x] = 1;
     }
   }
 
@@ -354,13 +361,48 @@ class GameScene extends Phaser.Scene {
     for (const [name, open] of Object.entries(room.doors)) {
       if (!open) continue;
       const locked = !!this.lockedDoors[DungeonGenerator.key(room.gx, room.gy) + ':' + name];
-      if (!(this.sealed || locked)) continue;
+      const bossDoor = this.doorToBoss(room, name);
+      if (!(this.sealed || locked || bossDoor)) continue;
       for (const [x, y] of DOOR_TILES[name]) {
-        const s = this.add.image(OX + x * T + T / 2, OY + y * T + T / 2, locked ? 'door_locked' : 'door_closed').setDepth(2);
+        const s = this.add.image(OX + x * T + T / 2, OY + y * T + T / 2, locked ? 'door_locked' : bossDoor ? 'door_boss' : 'door_closed').setDepth(2);
+        if (bossDoor) this.tweens.add({ targets: s, alpha: 0.55, duration: 500, yoyo: true, repeat: -1, delay: (x + y) * 60 });
         this.doorLayer.add(s);
         this.doorSprites.push(s);
       }
     }
+  }
+
+  /** La puerta del jefe se abre cuando todas las salas de combate de la planta están limpias. */
+  bossUnlocked() { return this.dungeon.list.every(r => r.type !== 'combat' || r.cleared); }
+
+  combatProgress() { const l = this.dungeon.list.filter(r => r.type === 'combat'); return { done: l.filter(r => r.cleared).length, total: l.length }; }
+
+  doorToBoss(room, name) {
+    const d = DIRS[name], nb = this.dungeon.get(room.gx + d.dx, room.gy + d.dy);
+    return !!(nb && nb.type === 'boss' && !this.bossUnlocked());
+  }
+
+  /** Velocidad a la que los enemigos recargan sus ataques: aumenta con la profundidad. */
+  attackRate() { return Math.min(1.7, 1 + 0.022 * (this.floor - 1)); }
+
+  /** El jefe llama refuerzos: 2·N élites y 3+N enemigos normales (N = planta), con un tope. */
+  bossHorde(boss, frac = 1) {
+    const f = this.floor, rng = this.rng;
+    const nElite = Math.max(1, Math.round(Math.min(14, 2 * f) * frac)), nNorm = Math.max(2, Math.round(Math.min(16, 3 + f) * frac));
+    const W = Object.entries(SPAWN_TABLES[spawnTier(f)]).filter(([k]) => k !== 'turret' && k !== 'healer');
+    const total = W.reduce((a, b) => a + b[1], 0);
+    Bus.emit('boss:horde', { elites: nElite, normals: nNorm });
+    this.cameras.main.shake(280, 0.008); this.sfx('boom');
+    const spawn = (type, elite, i) => this.time.delayedCall(i * 75, () => {
+      if (this.runOver || this.room.type !== 'boss' || this.enemies.filter(e => !e.dead).length > 38) return;
+      const p = this.randomFreePoint(14, 90);
+      this.ringFx(p.x, p.y, elite ? 54 : 36, elite ? ELITE_AFFIX[elite].color : 0xffe94d);
+      this.spawnBurst(p.x, p.y, elite ? ELITE_AFFIX[elite].color : 0xffe94d, 10);
+      this.spawnEnemy(type, p.x, p.y, true, elite);
+    });
+    let i = 0;
+    for (let k = 0; k < nElite; k++) spawn(rng.pick(ELITE_TYPES), rng.pick(['fast', 'volatile', 'armored']), i++);
+    for (let k = 0; k < nNorm; k++) { let r = rng() * total, type = 'grunt'; for (const [t, w] of W) { if ((r -= w) <= 0) { type = t; break; } } spawn(type, null, i++); }
   }
 
   /** Círculo (x,y,r) contra baldosas sólidas y el borde de la sala. */
@@ -430,8 +472,7 @@ class GameScene extends Phaser.Scene {
   updateItems(dt) {
     const p = this.player;
     const press = Phaser.Input.Keyboard.JustDown(this.keyE) || this.touch.interact;
-    const tPress = Phaser.Input.Keyboard.JustDown(this.keyT) || this.touch.portal;
-    this.touch.interact = false; this.touch.portal = false;
+    this.touch.interact = false;
     for (const it of this.items.slice()) {
       if (it.collected) continue;
       it.update(dt);
@@ -440,15 +481,9 @@ class GameScene extends Phaser.Scene {
       if (mag && it.auto && !(it.kind === 'heart' && p.hp >= p.maxHp) && d < 70 + 70 * mag && d > 1) {   // imán
         it.x += (p.x - it.x) / d * 260 * dt; it.baseY += (p.y - it.baseY) / d * 260 * dt;
       }
-      if (it.kind === 'generator') {                            // se activa con T (o con el botón en móvil)
-        const near = d < 70;
-        if (it.label) it.label.setColor(near ? '#ffe94d' : '#cffcff');
-        if (near && tPress && !it.activated) this.activateGenerator(it);
-        continue;
-      }
       if (it.kind === 'portal') {                               // se atraviesa caminando hacia él
-        if (this.time.now % 3 === 0 && !this.travelling) { const a = this.rng() * 6.283; this.spark(it.x + Math.cos(a) * 46, it.baseY + Math.sin(a) * 46, this.rng() < 0.5 ? 0x00f0ff : 0xff2bd6, 0.9); }
-        if (d < 30 && !this.travelling && this.time.now > (it.lock || 0)) this.tryEnterPortal(it);
+        if (this.time.now % 3 === 0 && !this.travelling) { const a = this.rng() * 6.283, rr = (it.enterR || 30) * 1.5; this.spark(it.x + Math.cos(a) * rr, it.baseY + Math.sin(a) * rr, this.rng() < 0.5 ? 0x00f0ff : 0xff2bd6, 0.9); }
+        if (d < (it.enterR || 30) && !this.travelling && this.time.now > (it.lock || 0)) this.tryEnterPortal(it);
         continue;
       }
       if (it.auto && d < 24) { this.collect(it); continue; }
@@ -469,7 +504,7 @@ class GameScene extends Phaser.Scene {
     }
     switch (it.kind) {
       case 'coin': p.credits += 1; this.creditsEarned++; Missions.track('coins'); this.sfx('coin'); break;
-      case 'chest': this.openChest(it.data2.tier || 1); this.sfx('module'); break;
+      case 'chest': this.openChest(it.data2.tier || 1, it); return;
       case 'heart':
         if (!it.price && p.hp >= p.maxHp) { it.baseY -= 0; return; }      // no se desperdicia con la vida llena
         p.heal(1); this.sfx('heal'); break;
@@ -530,7 +565,7 @@ class GameScene extends Phaser.Scene {
           let dmg = b.spec.damage, crit = false;
           if (e.hasStatus('slow') && b.spec.tags.includes('explosion')) dmg *= 1.5;
           if (b.spec.crit && this.rng() < b.spec.crit) { dmg *= 2; crit = true; this.floatText(e.x, e.y - e.radius - 20, '¡CRÍTICO!', 0xffe94d); this.spawnBurst(b.x, b.y, 0xffe94d, 6); }
-          e.takeDamage(dmg, 'player', { color: crit ? 0xffe94d : b.spec.color });
+          e.takeDamage(dmg, 'player', { color: crit ? 0xffe94d : b.spec.color, dir: Math.atan2(b.vy, b.vx) });
           e.knock(Math.atan2(b.vy, b.vx), 90);
           this.spark(b.x, b.y, b.spec.color, 1);
           Bus.emit('bullet:hit', { bullet: b, target: e });
@@ -598,9 +633,12 @@ class GameScene extends Phaser.Scene {
   /** Secuencia: cámara lenta, el jefe tiembla y parpadea, explosiones en cadena y estallido final. */
   bossDeath(e) {
     const x0 = e.x, y0 = e.y, col = e.color, cam = this.cameras.main;
+    this.bossDeathPos = { x: x0, y: y0 };
     this.bulletPool.forEach(b => { if (b.owner === 'enemy') { this.spark(b.x, b.y, 0xffffff, 1.2); this.releaseBullet(b); } });
     Bus.emit('boss:dead', { name: e.bossName });
     this.slowmo = 0.3;
+    cam.pan(x0, y0, 700, 'Sine.easeInOut'); cam.zoomTo(1.28, 900, 'Sine.easeInOut');                    // la cámara se acerca al jefe
+    cam.flash(260, 255, 40, 160);
     this.tweens.addCounter({ from: 0.3, to: 1, duration: 2200, ease: 'Quad.easeIn', onUpdate: tw => { this.slowmo = tw.getValue(); }, onComplete: () => { this.slowmo = 1; } });
     cam.shake(2200, 0.005);
     this.sfx('boom');
@@ -609,6 +647,10 @@ class GameScene extends Phaser.Scene {
       e.setPosition(x0 + (this.rng() - 0.5) * 9, y0 + (this.rng() - 0.5) * 9);
       e.setTint(this.rng() < 0.5 ? 0xffffff : col);
     } });
+    for (let k = 0; k < 6; k++) this.time.delayedCall(300 + k * 330, () => {                // rayos de energía que escapan del cuerpo
+      if (!e.active) return;
+      for (let n = 0; n < 4; n++) { const a = this.rng() * 6.283, r = 70 + this.rng() * 90; this.spawnLightning(x0 + Math.cos(a) * 12, y0 + Math.sin(a) * 12, x0 + Math.cos(a) * r, y0 + Math.sin(a) * r, k % 2 ? 0xffe94d : col); }
+    });
     for (let i = 0; i < 16; i++) {                                                       // explosiones en cadena sobre el cuerpo
       this.time.delayedCall(i * 135, () => {
         if (!e.active) return;
@@ -625,48 +667,61 @@ class GameScene extends Phaser.Scene {
       [60, 100, 150, 200].forEach((r, k) => this.time.delayedCall(k * 90, () => this.ringFx(x0, y0, r, k % 2 ? 0xffe94d : col)));
       this.spawnBurst(x0, y0, col, 40); this.spawnBurst(x0, y0, 0xffe94d, 40); this.spawnBurst(x0, y0, 0xffffff, 24);
       this.sfx('boom'); this.sfx('kill');
+      this.shatter(e);                                                                  // el cuerpo se rompe en fragmentos
+      cam.pan(CFG.W / 2, CFG.H / 2, 900, 'Sine.easeInOut'); cam.zoomTo(1, 900, 'Sine.easeInOut');
+      this.time.delayedCall(1000, () => { cam.setZoom(1); cam.setScroll(0, 0); });
       this.tweens.add({ targets: [e, e.glowImg], scaleX: e.scaleX * 1.7, scaleY: e.scaleY * 1.7, alpha: 0, duration: 380, ease: 'Cubic.easeOut',
         onComplete: () => { if (e.active) e.destroy(); Bus.emit('enemy:killed', { enemy: e }); } });
     });
   }
 
+  /** Rompe un sprite en una rejilla de fragmentos que salen despedidos (se usa con jefes y élites). */
+  shatter(e, grid = 5, power = 1) {
+    const key = e.texture.key, fw = e.frame.width, fh = e.frame.height;
+    for (let r = 0; r < grid; r++) for (let c = 0; c < grid; c++) {
+      const img = this.add.image(e.x, e.y, key).setScale(e.scaleX, e.scaleY).setDepth(28).setRotation(e.rotation);
+      img.setCrop((c * fw) / grid, (r * fh) / grid, fw / grid, fh / grid);
+      const dx = (c - (grid - 1) / 2) * 22 * e.scaleX * 2 * power, dy = (r - (grid - 1) / 2) * 22 * e.scaleY * 2 * power;
+      this.tweens.add({ targets: img, x: e.x + dx + (this.rng() - 0.5) * 40, y: e.y + dy + 30 + this.rng() * 50, rotation: img.rotation + (this.rng() - 0.5) * 3.2, alpha: 0, duration: 900 + this.rng() * 600, ease: 'Quad.easeOut', onComplete: () => img.destroy() });
+    }
+  }
+
   // ===================================================================================
   //  Generador de portal, portal y viaje entre pisos
   // ===================================================================================
-  /** El jefe suelta un generador de portal: cae desde arriba con una columna de luz. */
-  dropGenerator(x, y) {
-    const gen = this.addItem('generator', x, y, {});
-    gen.setAlpha(0).baseY = y - 170;
-    this.tweens.add({ targets: gen, baseY: y, alpha: 1, duration: 700, ease: 'Bounce.easeOut', delay: 250 });
-    const beam = this.add.rectangle(x, y - 100, 26, 220, 0x00f0ff, 0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(7);
-    this.tweens.add({ targets: beam, alpha: 0, scaleX: 0.2, duration: 950, onComplete: () => beam.destroy() });
-    this.time.delayedCall(950, () => { this.ringFx(x, y, 60, 0x00f0ff); this.spawnBurst(x, y, 0x00f0ff, 18); this.cameras.main.shake(160, 0.006); this.sfx('boom'); });
-    this.floatText(x, y - 56, 'Pulsa T para activar el portal', 0x00f0ff);
+  /** Punto libre más cercano a (x,y) (el cofre aparece donde murió el jefe). */
+  freeNear(x, y) {
+    for (let r = 0; r < 240; r += 20) for (let k = 0; k < (r ? 10 : 1); k++) {
+      const a = (k / 10) * 6.283, px = x + Math.cos(a) * r, py = y + Math.sin(a) * r;
+      if (!this.collides(px, py, 22)) return { x: px, y: py };
+    }
+    return this.roomCenter();
   }
 
-  /** T cerca del generador: se carga, lanza un rayo y abre el portal. */
-  activateGenerator(it) {
-    it.activated = true;
-    const x = it.x, y = it.baseY;
-    this.sfx('module'); this.cameras.main.shake(700, 0.004);
-    if (it.label) it.label.setVisible(false);
-    this.tweens.add({ targets: it, scale: it.scaleX * 1.12, duration: 90, yoyo: true, repeat: 6 });            // vibra al cargar
-    for (let i = 0; i < 3; i++) {                                                                                // anillos que se contraen
-      const ring = this.add.circle(x, y, 110, 0x00f0ff, 0).setStrokeStyle(3, i % 2 ? 0xff2bd6 : 0x00f0ff, 1).setDepth(26).setBlendMode(Phaser.BlendModes.ADD);
-      this.tweens.add({ targets: ring, radius: 8, alpha: 0.2, duration: 650, delay: i * 180, ease: 'Cubic.easeIn', onComplete: () => ring.destroy() });
-    }
-    const beam = this.add.rectangle(x, y - 150, 18, 300, 0xffffff, 0.8).setBlendMode(Phaser.BlendModes.ADD).setDepth(27).setScale(1, 0).setOrigin(0.5, 1);
-    beam.y = y;
-    this.time.delayedCall(700, () => {
-      this.tweens.add({ targets: beam, scaleY: 1, scaleX: 2.4, alpha: 0, duration: 420, onComplete: () => beam.destroy() });
-      this.cameras.main.flash(260, 150, 240, 255);
-      it.remove();
-      const portal = this.addItem('portal', x, y, {});                                                           // el portal se abre
-      portal.setScale(0).setAlpha(0.2); portal.lock = this.time.now + 1800;                 // margen para no entrar sin querer
-      this.tweens.add({ targets: portal, scale: 1.05 * Art.scaleOf('portal_swirl'), alpha: 1, duration: 650, ease: 'Back.easeOut' });
-      this.ringFx(x, y, 120, 0x00f0ff); this.ringFx(x, y, 80, 0xff2bd6);
-      this.spawnBurst(x, y, 0x00f0ff, 30); this.sfx('boom');
-      this.floatText(x, y - 62, '¡Portal abierto!', 0x00f0ff);
+  /** Botín del jefe: el cofre cae donde murió y se abre un portal grande en un lado aleatorio de la sala (lejos del cofre). */
+  dropBossLoot(x, y, tier) {
+    const spot = this.freeNear(x, y), { OX, OY, RW, RH, T } = CFG, c = this.roomCenter();
+    const chest = this.addItem('chest', spot.x, spot.y, { tier });
+    chest.setAlpha(0); chest.baseY = spot.y - 150;
+    chest.lid.setAlpha(0);
+    this.tweens.add({ targets: chest, baseY: spot.y, alpha: 1, duration: 650, ease: 'Bounce.easeOut', delay: 150 });
+    this.tweens.add({ targets: chest.lid, alpha: 1, duration: 300, delay: 150 });
+    const beam = this.add.rectangle(spot.x, spot.y - 90, 30, 200, CHEST_TIERS[tier - 1].color, 0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(7);
+    this.tweens.add({ targets: beam, alpha: 0, scaleX: 0.15, duration: 900, onComplete: () => beam.destroy() });
+    this.time.delayedCall(800, () => { this.ringFx(spot.x, spot.y, 70, CHEST_TIERS[tier - 1].color); this.spawnBurst(spot.x, spot.y, CHEST_TIERS[tier - 1].color, 20); this.cameras.main.shake(140, 0.005); this.sfx('boom'); });
+    // portal: lado aleatorio, nunca el del cofre
+    const m = 96, sides = [{ x: OX + m, y: c.y }, { x: OX + RW * T - m, y: c.y }, { x: c.x, y: OY + m }, { x: c.x, y: OY + RH * T - m }]
+      .filter(s => Math.hypot(s.x - spot.x, s.y - spot.y) > 240 && !this.collides(s.x, s.y, 30));
+    const pos = (sides.length ? this.rng.pick(sides) : { x: c.x + (spot.x < c.x ? 280 : -280), y: c.y });
+    this.time.delayedCall(1000, () => {
+      if (this.room.type !== 'boss') return;
+      const portal = this.addItem('portal', pos.x, pos.y, { big: true });
+      const full = portal.scaleX;
+      portal.setScale(0).setAlpha(0.2); portal.lock = this.time.now + 1800;
+      this.tweens.add({ targets: portal, scale: full, alpha: 1, duration: 900, ease: 'Back.easeOut' });
+      this.cameras.main.flash(300, 150, 240, 255); this.cameras.main.shake(500, 0.006);
+      this.ringFx(pos.x, pos.y, 150, 0x00f0ff); this.ringFx(pos.x, pos.y, 100, 0xff2bd6); this.spawnBurst(pos.x, pos.y, 0x00f0ff, 36); this.sfx('open'); this.sfx('boom');
+      Bus.emit('portal:open', {});
     });
   }
 
@@ -692,7 +747,7 @@ class GameScene extends Phaser.Scene {
     this.floatText(it.x, it.y - 50, '', 0xffffff);
     this.tweens.add({ targets: p, x: it.x, y: it.baseY, duration: 380, ease: 'Cubic.easeIn' });
     this.tweens.add({ targets: p, rotation: p.rotation + Math.PI * 5, duration: dur, ease: 'Cubic.easeIn' });
-    this.tweens.add({ targets: [p, p.wpImg, p.glowImg], scaleX: 0, scaleY: 0, alpha: 0, duration: dur, ease: 'Cubic.easeIn' });
+    this.tweens.add({ targets: [p, p.wpImg, p.glowImg, p.legImg], scaleX: 0, scaleY: 0, alpha: 0, duration: dur, ease: 'Cubic.easeIn' });
     this.tweens.add({ targets: it, scale: it.scaleX * 1.35, duration: dur, ease: 'Sine.easeIn' });
     cam.pan(it.x, it.baseY, dur, 'Cubic.easeInOut'); cam.zoomTo(1.7, dur, 'Cubic.easeIn');
     this.ringFx(it.x, it.baseY, 90, 0x00f0ff); this.spawnBurst(it.x, it.baseY, 0xff2bd6, 22);
@@ -700,7 +755,7 @@ class GameScene extends Phaser.Scene {
     this.time.delayedCall(dur + 120, () => {
       cam.setZoom(1); cam.setScroll(0, 0);
       p.setScale(Art.scaleOf(p.texture.key)).setAlpha(1).setRotation(0);
-      p.wpImg.setScale(1).setAlpha(1); p.glowImg.setScale(1.7).setAlpha(0.45);
+      p.wpImg.setScale(1).setAlpha(1); p.glowImg.setScale(1.7).setAlpha(0.45); p.legImg.setScale(Art.scaleOf(p.legImg.texture.key)).setAlpha(1);
       this.travelling = false;
       this.nextFloor();
       cam.fadeIn(650, 0, 0, 0);
@@ -733,35 +788,100 @@ class GameScene extends Phaser.Scene {
     Bus.emit('upgrade:picked', { id });
   }
 
-  openChest(tier) {
+  /** Apertura del cofre virtual: sacude, la tapa se levanta, rayos de luz, los premios salen volando y luego se muestra el botín. */
+  openChest(tier, it) {
     const items = Chests.open(tier, () => this.rng());
     this.chestOpen = true;
-    this.cameras.main.flash(200, 255, 220, 120);
-    Bus.emit('chest:open', { tier, items });
+    it.collected = true; it.opening = true;
+    const x = it.x, y = it.baseY, col = CHEST_TIERS[tier - 1].color, cam = this.cameras.main;
+    this.sfx('module');
+    this.tweens.add({ targets: it, x: { from: x - 3, to: x + 3 }, duration: 55, yoyo: true, repeat: 5, onComplete: () => it.setX(x) });       // vibra
+    this.tweens.add({ targets: it.glowFx, alpha: 1, scale: 4.2, duration: 500 });
+    this.time.delayedCall(420, () => {                                                                                                              // tapa fuera
+      this.sfx('open'); cam.shake(260, 0.006);
+      this.tweens.add({ targets: it.lid, y: y - 52, angle: -26, x: x - 10, duration: 360, ease: 'Back.easeOut' });
+      for (let k = 0; k < 4; k++) {                                                                                                                 // columnas de luz
+        const b = this.add.rectangle(x + (k - 1.5) * 9, y - 40, 9 - k, 150, k % 2 ? 0xffffff : col, 0.75).setBlendMode(Phaser.BlendModes.ADD).setDepth(30).setScale(1, 0).setOrigin(0.5, 1);
+        b.y = y - 10;
+        this.tweens.add({ targets: b, scaleY: 1, alpha: 0, duration: 900, delay: k * 50, ease: 'Cubic.easeOut', onComplete: () => b.destroy() });
+      }
+      this.ringFx(x, y, 90, col); this.ringFx(x, y - 10, 140, 0x00f0ff);
+      this.spawnBurst(x, y - 20, col, 30); this.spawnBurst(x, y - 20, 0xffffff, 14);
+      items.forEach((r, i) => {                                                                                                                    // los premios salen disparados
+        const tex = r.kind === 'skin' ? 'skin_' + r.id : r.kind === 'upgrade' ? 'module' : r.kind === 'frag' ? 'module' : 'coin';
+        const ic = this.add.image(x, y - 14, tex).setDepth(31).setScale(Art.sc(tex, r.kind === 'skin' ? 0.9 : 1.2)).setAlpha(0);
+        if (r.kind === 'upgrade') ic.setTint(0x5dff8a); else if (r.kind === 'frag') ic.setTint(0x00f0ff);
+        const a = -Math.PI / 2 + (i - (items.length - 1) / 2) * 0.55;
+        this.tweens.add({ targets: ic, alpha: 1, x: x + Math.cos(a) * 84, y: y - 14 + Math.sin(a) * 96, duration: 520, delay: 120 + i * 90, ease: 'Cubic.easeOut' });
+        this.tweens.add({ targets: ic, y: '+=8', scale: ic.scaleX * 1.12, duration: 380, yoyo: true, repeat: 1, delay: 700 + i * 90 });
+        this.tweens.add({ targets: ic, alpha: 0, scale: 0.2, x: x, y: y - 30, duration: 320, delay: 1260 + i * 40, ease: 'Cubic.easeIn', onComplete: () => ic.destroy() });
+      });
+    });
+    this.time.delayedCall(1750, () => {
+      cam.flash(240, 255, 240, 180); this.sfx('module');
+      it.remove();
+      Bus.emit('chest:open', { tier, items });
+    });
   }
 
   closeChest() { this.chestOpen = false; }
 
-  /** Campo de fuerza: área alrededor del jugador que daña a los enemigos que la tocan. */
+  /** Campo de fuerza: zona eléctrica alrededor del jugador que daña (y ralentiza) a los enemigos que la tocan. */
   updateForcefield(dt) {
     const p = this.player, n = p.stack('forcefield');
-    if (!this.ffGfx) { this.ffGfx = this.add.graphics().setDepth(7); this.ffT = 0; }
+    if (!this.ffGfx) {
+      this.ffGfx = this.add.graphics().setDepth(7).setBlendMode(Phaser.BlendModes.ADD);
+      this.ffGlow = this.add.image(0, 0, 'glow').setBlendMode(Phaser.BlendModes.ADD).setTint(0x2ab4ff).setDepth(6).setVisible(false);
+      this.ffT = 0; this.ffArcT = 0; this.ffArcs = [];
+    }
     const g = this.ffGfx;
     g.clear();
-    if (!n || p.dead) return;
+    if (!n || p.dead) { this.ffGlow.setVisible(false); return; }
     const R = 52 + 24 * n, dps = 2 + 1.8 * n, t = this.time.now / 1000;
-    g.fillStyle(0x00f0ff, 0.06 + 0.02 * n); g.fillCircle(p.x, p.y, R);
-    g.lineStyle(2, 0x00f0ff, 0.55 + 0.25 * Math.sin(t * 5)); g.strokeCircle(p.x, p.y, R);
-    g.lineStyle(3, 0x00f0ff, 0.7);
-    for (let i = 0; i < 3; i++) { const a = t * 1.8 + i * 2.094; g.beginPath(); g.arc(p.x, p.y, R - 5, a, a + 0.8); g.strokePath(); }
+    this.ffGlow.setVisible(true).setPosition(p.x, p.y).setScale(R / 22).setAlpha(0.32 + 0.1 * Math.sin(t * 9));
+    g.fillStyle(0x1a8cff, 0.1 + 0.025 * n); g.fillCircle(p.x, p.y, R);
+    g.fillStyle(0x9ff6ff, 0.07); g.fillCircle(p.x, p.y, R * 0.62);
+    // borde ondulante (ruido eléctrico)
+    const N = 40;
+    for (let pass = 0; pass < 2; pass++) {
+      g.lineStyle(pass ? 1.5 : 4, pass ? 0xffffff : 0x34b8ff, pass ? 0.95 : 0.55);
+      g.beginPath();
+      for (let i = 0; i <= N; i++) {
+        const a = (i / N) * 6.283, w = 1 + 0.03 * Math.sin(t * 14 + i * 2.3) + (Math.random() - 0.5) * (pass ? 0.05 : 0.03);
+        const x = p.x + Math.cos(a) * R * w, y = p.y + Math.sin(a) * R * w;
+        if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+      }
+      g.strokePath();
+    }
+    // rayos internos que cambian ~14 veces por segundo
+    this.ffArcT -= dt;
+    if (this.ffArcT <= 0) {
+      this.ffArcT = 0.07;
+      this.ffArcs = [];
+      const count = 3 + n;
+      for (let k = 0; k < count; k++) {
+        const a0 = this.rng() * 6.283, pts = [], steps = 7, r0 = R * (0.15 + this.rng() * 0.25);
+        for (let s = 0; s <= steps; s++) { const rr = r0 + (R - r0) * (s / steps), aa = a0 + (this.rng() - 0.5) * 0.55 * (s / steps); pts.push([Math.cos(aa) * rr, Math.sin(aa) * rr]); }
+        this.ffArcs.push(pts);
+      }
+    }
+    for (const pts of this.ffArcs) {
+      for (const [lw, col, al] of [[5, 0x2a8cff, 0.35], [2, 0xcff6ff, 0.95]]) {
+        g.lineStyle(lw, col, al); g.beginPath(); g.moveTo(p.x + pts[0][0], p.y + pts[0][1]);
+        for (let s = 1; s < pts.length; s++) g.lineTo(p.x + pts[s][0] + (Math.random() - 0.5) * 3, p.y + pts[s][1] + (Math.random() - 0.5) * 3);
+        g.strokePath();
+      }
+    }
+    if (Math.random() < 0.5) this.spark(p.x + (Math.random() - 0.5) * R * 1.6, p.y + (Math.random() - 0.5) * R * 1.6, 0x9ff6ff, 0.8);
     this.ffT -= dt;
     if (this.ffT > 0) return;
     this.ffT = 0.25;
     for (const e of this.enemies) {
       if (e.dead || e.spawnT > 0 || (e.x - p.x) ** 2 + (e.y - p.y) ** 2 > (R + e.radius) ** 2) continue;
-      e.takeDamage(dps * 0.25 * p.damageMult, 'player', { color: 0x00f0ff });
+      e.takeDamage(dps * 0.25 * p.damageMult, 'player', { color: 0x9ff6ff });
+      this.spawnLightning(p.x + (Math.random() - 0.5) * 8, p.y + (Math.random() - 0.5) * 8, e.x, e.y, 0x9ff6ff);     // el rayo salta hasta el enemigo
       if (n >= 3 && !e.dead) e.addStatus('slow', 0.6, 0.7);
-      this.spark(e.x, e.y, 0x00f0ff, 1);
+      this.spark(e.x, e.y, 0xffffff, 1.2);
     }
   }
 
@@ -891,6 +1011,11 @@ class GameScene extends Phaser.Scene {
         g.lineStyle(5, 0xb6ff3c, 0.12 + a * 0.2); g.lineBetween(e.x, e.y, end.x, end.y);
         g.lineStyle(1.5, 0xe6ffb0, a + 0.3); g.lineBetween(e.x, e.y, end.x, end.y);
       }
+      if (e.mortarTarget) {                                                     // zona de impacto del mortero
+        const pr = Math.min(1, e.attackTime / 1.15), pulse = 0.5 + 0.5 * Math.sin(this.time.now / 60);
+        g.fillStyle(0xff4a1c, 0.1 + 0.22 * pr); g.fillCircle(e.mortarTarget.x, e.mortarTarget.y, 66 * pr);
+        g.lineStyle(2.5, 0xff8a3c, 0.5 + 0.4 * pulse); g.strokeCircle(e.mortarTarget.x, e.mortarTarget.y, 66);
+      }
       if (e.type === 'boss' || e.spawnT > 0) continue;
       if (e.hp >= e.maxHp && !e.elite) continue;
       const w = Math.max(24, e.radius * 2 + 8), x = e.x - w / 2, y = e.y - e.radius - 14;
@@ -1005,6 +1130,16 @@ class GameScene extends Phaser.Scene {
   checkDoors() {
     const p = this.player, room = this.room, { OX, OY, RW, RH, T } = CFG;
     if (this.transition) return;
+    for (const [name, open] of Object.entries(room.doors)) {                     // pista de la puerta del jefe cerrada
+      if (!open || !this.doorToBoss(room, name)) continue;
+      const tl = DOOR_TILES[name];
+      const dx = OX + (tl.reduce((s, t) => s + t[0], 0) / tl.length + 0.5) * T, dy = OY + (tl.reduce((s, t) => s + t[1], 0) / tl.length + 0.5) * T;
+      if (Math.hypot(dx - p.x, dy - p.y) < 90 && (!this.bossHint || this.time.now - this.bossHint > 2500)) {
+        this.bossHint = this.time.now;
+        const pr = this.combatProgress();
+        this.floatText(dx, dy - 24, `Puerta del jefe cerrada: salas ${pr.done}/${pr.total}`, 0xff2bd6);
+      }
+    }
     // puertas con llave de salas vecinas
     for (const [name, open] of Object.entries(room.doors)) {
       const id = DungeonGenerator.key(room.gx, room.gy) + ':' + name;

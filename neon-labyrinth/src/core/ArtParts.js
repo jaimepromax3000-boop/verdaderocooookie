@@ -202,12 +202,56 @@ Object.assign(Art, {
     }
   },
 
+  /** Dibuja con un contorno oscuro nítido alrededor de la silueta (da profundidad y lectura a cualquier fondo). */
+  makeOutlined(scene, key, w, h, draw) {
+    this.make(scene, key, w, h, c => {
+      const mk = () => { const o = document.createElement('canvas'); o.width = w * 2; o.height = h * 2; const oc = o.getContext('2d'); oc.scale(2, 2); return [o, oc]; };
+      const [o, oc] = mk(); draw(oc, w, h);
+      const [sil, sc] = mk(); sc.drawImage(o, 0, 0, w, h); sc.globalCompositeOperation = 'source-in'; sc.fillStyle = '#04050c'; sc.fillRect(0, 0, w, h);
+      for (let k = 0; k < 8; k++) { const a = k * Math.PI / 4; c.drawImage(sil, Math.cos(a) * 0.9, Math.sin(a) * 0.9, w, h); }
+      c.drawImage(o, 0, 0, w, h);
+    });
+  },
+
   /** Skins (sin armadura) y piezas sueltas: se generan al arrancar. */
   skins(scene) {
     SKINS.forEach(sk => {
-      this.make(scene, 'skinbase_' + sk.id, 40, 40, c => { c.save(); c.shadowColor = this.css(0x000000, 0.45); c.shadowBlur = 2; c.shadowOffsetY = 1; this.skinBase(c, sk.id); c.restore(); });
+      this.makeOutlined(scene, 'skinbase_' + sk.id, 40, 40, c => { c.save(); c.shadowColor = this.css(0x000000, 0.4); c.shadowBlur = 2; c.shadowOffsetY = 1; this.skinBase(c, sk.id); c.restore(); });
       this.compose(scene, sk.id, null, 'skin_' + sk.id);
     });
+  },
+
+  /** Piernas animadas: devuelve las claves de las texturas del torso y de los 3 fotogramas de piernas (quieto, paso A, paso B). */
+  playerParts(scene, skinId) {
+    const arm = Meta.data.armor, A = this, sig = ['helmet', 'chest', 'pants', 'boots'].map(k => (arm[k] || '-')[0]).join('');
+    const upper = `pu_${skinId}_${sig}`;
+    if (!scene.textures.exists(upper)) A.makeOutlined(scene, upper, 40, 40, c => {
+      c.drawImage(scene.textures.get('skinbase_' + skinId).getSourceImage(), 0, 0, 40, 40);
+      if (arm.chest) A.chestPiece(c, 20, 25, 1, arm.chest);
+      if (arm.helmet) A.helmetPiece(c, 20, 14, 1, arm.helmet);
+    });
+    const legs = { i: [0, 0], a: [-3.2, 2.4], b: [2.4, -3.2] }, keys = {};
+    for (const f of ['i', 'a', 'b']) {
+      const key = `plegs_${sig}_${f}`; keys[f] = key;
+      if (scene.textures.exists(key)) continue;
+      const [ly, ry] = legs[f];
+      A.makeOutlined(scene, key, 40, 40, c => {
+        const one = (sx, dy) => {
+          if (arm.pants) { c.save(); c.translate(0, dy); A.pantsPiece(c, 20 + (sx < 0 ? 0 : 0), 32.4, 1, arm.pants); c.restore(); }
+          else { c.beginPath(); c.ellipse(20 + sx * 4.6, 32.4 + dy, 4, 4.7, 0, 0, A.T); c.fillStyle = A.lg(c, 0, 28, 0, 37, [[0, 0x4a5468], [1, 0x1c2230]]); c.fill(); }
+        };
+        // pantalones/botas por pierna: se dibujan completos y se recorta por mitades para mover cada pierna por separado
+        for (const sx of [-1, 1]) {
+          c.save(); c.beginPath(); c.rect(sx < 0 ? 0 : 20, 20, 20, 24); c.clip();
+          const dy = sx < 0 ? ly : ry;
+          c.translate(0, dy);
+          if (arm.pants) A.pantsPiece(c, 20, 32.4, 1, arm.pants); else { for (const q of [-1, 1]) { c.beginPath(); c.ellipse(20 + q * 4.6, 32.4, 4, 4.7, 0, 0, A.T); c.fillStyle = A.lg(c, 0, 28, 0, 37, [[0, 0x4a5468], [1, 0x1c2230]]); c.fill(); c.strokeStyle = A.css(0x0a0e18, 0.9); c.lineWidth = 0.6; c.stroke(); } }
+          if (arm.boots) A.bootsPiece(c, 20, 36.2, 1, arm.boots); else { for (const q of [-1, 1]) { A.rr(c, 20 + q * 4.6 - 3.1, 33.8, 6.2, 5.6, 2.2); c.fillStyle = A.lg(c, 0, 34, 0, 39, [[0, 0x3a3a46], [1, 0x0c0c12]]); c.fill(); c.strokeStyle = A.css(0x000000, 0.9); c.lineWidth = 0.6; c.stroke(); } }
+          c.restore();
+        }
+      });
+    }
+    return { upper, idle: keys.i, a: keys.a, b: keys.b };
   },
 
   /** Compone skin + armadura equipada y devuelve la clave de la textura (se cachea por firma). */
@@ -276,6 +320,38 @@ Object.assign(Art, {
     });
   },
 
+  /** Taller del herrero: pared de ladrillo, tuberías, herramientas colgadas y un foso de brasas. */
+  workshop(scene) {
+    const A = this, T = this.T;
+    A.make(scene, 'forge_bg', 244, 488, c => {
+      c.fillStyle = A.lg(c, 0, 0, 0, 488, [[0, 0x0b1124], [0.7, 0x070b18], [1, 0x14080a]]); c.fillRect(0, 0, 244, 488);
+      for (let y = 0, row = 0; y < 488; y += 17, row++) for (let x = (row % 2) * 18 - 18; x < 244; x += 36) {                        // ladrillos
+        const sh = 0.04 + ((x * 7 + y * 13) % 11) / 220;
+        c.fillStyle = A.css(0x2a3a6a, sh); c.fillRect(x + 1, y + 1, 34, 15); c.strokeStyle = A.css(0x1c2748, 0.7); c.lineWidth = 0.8; c.strokeRect(x + 0.5, y + 0.5, 35, 16);
+      }
+      for (const x of [10, 226]) {                                                                                                     // tuberías con anillos luminosos
+        A.rr(c, x - 5, 0, 10, 488, 3); c.fillStyle = A.lg(c, x - 5, 0, x + 5, 0, [[0, 0x1a2236], [0.5, 0x5a6a88], [1, 0x151c2e]]); c.fill();
+        for (let y = 30; y < 488; y += 74) { c.fillStyle = A.css(0x00f0ff, 0.85); c.fillRect(x - 6, y, 12, 3); A.glow(c, x, y + 1.5, 9, 0x00f0ff, 0.35); }
+      }
+      c.strokeStyle = A.css(0x6a7a98, 0.9); c.lineWidth = 2; c.beginPath(); c.moveTo(24, 246); c.lineTo(220, 246); c.stroke();     // barra con herramientas colgadas
+      const hang = (x, fn) => { c.save(); c.translate(x, 248); c.strokeStyle = A.css(0x8a9ab8, 0.9); c.fillStyle = A.lg(c, 0, 0, 0, 40, [[0, 0x9aa8c4], [1, 0x3a465e]]); fn(); c.restore(); };
+      hang(48, () => { c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 30); c.stroke(); A.rr(c, -8, 26, 16, 9, 2); c.fill(); });              // martillo
+      hang(92, () => { c.lineWidth = 3; c.beginPath(); c.moveTo(-5, 0); c.lineTo(0, 34); c.lineTo(5, 0); c.stroke(); });                                // tenazas
+      hang(136, () => { c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 28); c.stroke(); c.beginPath(); c.arc(0, 33, 6, 0, T); c.stroke(); }); // llave
+      hang(182, () => { c.lineWidth = 3; c.beginPath(); c.moveTo(0, 0); c.lineTo(0, 34); c.stroke(); A.poly(c, [[-7, 30], [7, 30], [0, 42]]); c.fill(); }); // cincel
+      A.rr(c, 24, 332, 196, 5, 2); c.fillStyle = A.lg(c, 0, 332, 0, 337, [[0, 0x6a7a98], [1, 0x2a3248]]); c.fill();                      // estante con viales
+      [[0x00f0ff, 40], [0xff2bd6, 66], [0x5dff8a, 92], [0xffe94d, 178], [0xff9a3c, 204]].forEach(([col, x]) => { A.rr(c, x - 6, 312, 12, 20, 4); c.fillStyle = A.css(col, 0.35); c.fill(); c.strokeStyle = A.css(col, 0.95); c.lineWidth = 1.2; c.stroke(); A.glow(c, x, 322, 11, col, 0.45); });
+      A.rr(c, 20, 506, 204, 46, 6); c.fillStyle = A.lg(c, 0, 506, 0, 552, [[0, 0x2a0e08], [1, 0x090303]]); c.fill(); c.strokeStyle = A.css(0x8a5a40, 0.9); c.lineWidth = 2; c.stroke();   // foso de brasas
+      c.fillStyle = A.rg(c, 122, 530, 4, 122, 530, 110, [[0, 0xffd060, 0.95], [0.35, 0xff7a1c, 0.8], [1, 0x7a1c08, 0]]); c.fillRect(20, 506, 204, 46);
+      for (let i = 0; i < 26; i++) { const x = 28 + (i * 37) % 188, y = 512 + (i * 17) % 34; A.glow(c, x, y, 5, i % 3 ? 0xff9a3c : 0xffe08a, 0.75); }
+    });
+    A.make(scene, 'flame', 24, 40, c => {
+      c.beginPath(); c.moveTo(12, 1); c.bezierCurveTo(22, 12, 24, 22, 20, 30); c.bezierCurveTo(18, 38, 6, 38, 4, 30); c.bezierCurveTo(0, 22, 4, 14, 8, 8); c.bezierCurveTo(9, 14, 12, 12, 12, 1); c.closePath();
+      c.fillStyle = A.lg(c, 0, 40, 0, 0, [[0, 0xff4a1c, 0.95], [0.45, 0xff9a3c, 0.9], [0.8, 0xffe08a, 0.8], [1, 0xffffff, 0]]); c.fill();
+      c.beginPath(); c.moveTo(12, 14); c.bezierCurveTo(17, 20, 17, 28, 12, 33); c.bezierCurveTo(7, 28, 7, 20, 12, 14); c.fillStyle = A.css(0xffffff, 0.6); c.fill();
+    });
+  },
+
   // ---------------------------------------------------------------- herrero virtual
   smith(scene) {
     const A = this, T = this.T;
@@ -296,6 +372,14 @@ Object.assign(Art, {
       A.ball(c, 102, 96, 8, 0x3a4252, 0.4);
       c.strokeStyle = A.lg(c, 100, 90, 112, 124, [[0, 0xc8d0e0], [1, 0x5a6478]]); c.lineWidth = 3; c.lineCap = 'round'; c.beginPath(); c.moveTo(100, 98); c.lineTo(108, 124); c.moveTo(106, 96); c.lineTo(112, 122); c.stroke();
       A.ball(c, 78, 52, 12, 0x6a7488, 0.55);                                                                                    // hombro derecho
+      // detalles: reactor en el pecho, hombreras con leds y cinturón con herramientas
+      A.glow(c, 60, 62, 12, 0x00f0ff, 0.7); A.ball(c, 60, 62, 6, 0x1a2a3a, 0.5); c.strokeStyle = A.css(0x00f0ff, 1); c.lineWidth = 1.6; c.beginPath(); c.arc(60, 62, 6, 0, T); c.stroke();
+      A.ball(c, 60, 62, 2.4, 0xcfffff, 0.9);
+      A.ball(c, 28, 56, 12, 0x6a7488, 0.55); c.strokeStyle = A.css(0x8aa0c8, 0.9); c.lineWidth = 1.5; c.beginPath(); c.arc(28, 56, 12, 0, T); c.stroke();
+      for (const [x, y] of [[24, 52], [32, 60]]) { A.glow(c, x, y, 4, 0x00f0ff, 0.9); }
+      A.rr(c, 30, 106, 60, 7, 2); c.fillStyle = A.lg(c, 0, 106, 0, 113, [[0, 0x6a4220], [1, 0x2a1608]]); c.fill(); c.strokeStyle = A.css(0xe8c890, 0.7); c.lineWidth = 0.8; c.stroke();
+      A.rr(c, 54, 105, 12, 9, 2); A.plate(c, 0xb8c0d0, 0xffffff, 0, 105, 0, 114, 1); A.glow(c, 60, 109.5, 4, 0x00f0ff, 0.8);
+      for (const x of [38, 80]) { A.rr(c, x - 5, 112, 10, 12, 2); c.fillStyle = A.lg(c, 0, 112, 0, 124, [[0, 0x7a5030], [1, 0x2a1608]]); c.fill(); c.strokeStyle = A.css(0x1a0c04, 0.9); c.lineWidth = 0.8; c.stroke(); }
       // cabeza: casco de forja con visor
       A.rr(c, 36, 10, 48, 46, 17); A.plate(c, 0x6a7488, 0x9ab0d8, 36, 10, 36, 56, 2);
       A.rr(c, 41, 24, 38, 16, 6); c.fillStyle = '#05080e'; c.fill();
@@ -426,5 +510,105 @@ Object.assign(Art, {
       c.shadowBlur = 0;
     });
     return key;
+  },
+
+  // ---------------------------------------------------------------- cofre virtual (holográfico) de jefe
+  chests(scene) {
+    const A = this, T = this.T, CY = 0x00f0ff;
+    [0xcd7f32, 0xc0c8d8, 0xffd23c].forEach((col, i) => {
+      const tier = i + 1, lite = A.lt(col, 0.55), dark = A.dk(col, 0.6);
+      const drawBase = c => {
+        c.fillStyle = A.css(0x000000, 0.4); c.beginPath(); c.ellipse(30, 32, 27, 4.5, 0, 0, T); c.fill();
+        A.rr(c, 4, 8, 52, 24, 4);                                                                 // cuerpo de cristal oscuro
+        c.fillStyle = A.lg(c, 0, 8, 0, 32, [[0, 0x14224a, 0.96], [1, 0x050818, 0.98]]); c.fill();
+        c.save(); A.rr(c, 4, 8, 52, 24, 4); c.clip();
+        c.strokeStyle = A.css(CY, 0.16); c.lineWidth = 0.6;                                         // rejilla holográfica
+        for (let x = 8; x < 56; x += 5) { c.beginPath(); c.moveTo(x, 8); c.lineTo(x, 32); c.stroke(); }
+        for (let y = 11; y < 32; y += 4) { c.beginPath(); c.moveTo(4, y); c.lineTo(56, y); c.stroke(); }
+        c.fillStyle = A.lg(c, 0, 24, 0, 32, [[0, col, 0], [1, col, 0.5]]); c.fillRect(4, 24, 52, 8);
+        c.restore();
+        c.shadowColor = A.css(CY, 1); c.shadowBlur = 4; c.strokeStyle = A.css(CY, 0.95); c.lineWidth = 0.9;      // circuitos
+        c.beginPath(); c.moveTo(8, 27); c.lineTo(16, 27); c.lineTo(19, 23); c.lineTo(23, 23); c.moveTo(52, 27); c.lineTo(45, 27); c.lineTo(42, 23); c.lineTo(38, 23); c.stroke(); c.shadowBlur = 0;
+        for (const sx of [0, 1]) { const x0 = sx ? 46 : 4; A.rr(c, x0, 8, 10, 24, 3); c.fillStyle = A.lg(c, x0, 0, x0 + 10, 0, [[0, A.mix(dark, col, 0.2)], [0.5, lite], [1, dark]]); c.fill(); c.strokeStyle = A.css(dark, 0.9); c.lineWidth = 0.7; c.stroke();
+          c.fillStyle = A.css(0xffffff, 0.85); for (const y of [12, 20, 28]) { c.beginPath(); c.arc(x0 + 5, y, 0.9, 0, T); c.fill(); } }
+        A.rr(c, 4, 8, 52, 24, 4); c.lineWidth = 1.6; c.strokeStyle = A.css(col, 1); c.shadowColor = A.css(col, 1); c.shadowBlur = 5; c.stroke(); c.shadowBlur = 0;
+        A.poly(c, A.ngon(30, 20, 6.5, 6, Math.PI / 6)); A.plate(c, 0x0a1230, CY, 23, 13, 37, 27, 1.2);                       // cerradura holográfica
+        A.glow(c, 30, 20, 8, CY, 0.8); c.fillStyle = A.css(0xffffff, 1); c.beginPath(); c.arc(30, 19, 1.8, 0, T); c.fill(); c.fillRect(29.3, 19.5, 1.4, 4);
+      };
+      const drawLid = c => {
+        c.beginPath(); c.moveTo(4, 24); c.lineTo(4, 14); c.quadraticCurveTo(4, 3, 16, 3); c.lineTo(44, 3); c.quadraticCurveTo(56, 3, 56, 14); c.lineTo(56, 24); c.closePath();
+        c.fillStyle = A.lg(c, 0, 3, 0, 24, [[0, A.mix(0x1a2c5a, col, 0.25)], [1, 0x070b1c]]); c.fill();
+        c.save(); c.clip();
+        c.fillStyle = A.rg(c, 22, 8, 1, 22, 8, 30, [[0, 0xffffff, 0.22], [1, 0xffffff, 0]]); c.fillRect(0, 0, 60, 26);
+        c.fillStyle = A.css(CY, 0.55); for (const [x, y, w] of [[14, 9, 14], [32, 9, 8], [14, 13, 8], [25, 13, 18], [14, 17, 20]]) c.fillRect(x, y, w, 1.5);      // líneas de datos
+        c.restore();
+        c.lineWidth = 1.6; c.strokeStyle = A.css(col, 1); c.shadowColor = A.css(col, 1); c.shadowBlur = 5; c.stroke(); c.shadowBlur = 0;
+        c.strokeStyle = A.css(CY, 0.95); c.lineWidth = 1.2; c.shadowColor = A.css(CY, 1); c.shadowBlur = 5; c.beginPath(); c.moveTo(5, 24); c.lineTo(55, 24); c.stroke(); c.shadowBlur = 0;   // junta luminosa
+        for (let k = 0; k < tier; k++) A.sparkle(c, 30 + (k - (tier - 1) / 2) * 11, 9, 2.4, 0xffffff);
+      };
+      A.make(scene, 'chestb_' + tier, 60, 34, drawBase);
+      A.make(scene, 'chestl_' + tier, 60, 26, drawLid);
+      A.make(scene, 'chest_' + tier, 60, 46, c => { A.glow(c, 30, 26, 30, col, 0.18); c.save(); c.translate(0, 12); drawBase(c); c.restore(); c.save(); drawLid(c); c.restore(); });
+    });
+    A.make(scene, 'holo_ring', 64, 64, c => {
+      c.strokeStyle = A.css(CY, 0.9); c.lineWidth = 1.6; c.shadowColor = A.css(CY, 1); c.shadowBlur = 5;
+      for (let k = 0; k < 6; k++) { c.beginPath(); c.arc(32, 32, 28, k * T / 6 + 0.1, k * T / 6 + 0.85); c.stroke(); }
+      c.lineWidth = 1; c.beginPath(); c.arc(32, 32, 21, 0, T); c.stroke();
+    });
+  },
+
+  // ---------------------------------------------------------------- enemigos nuevos
+  enemies2(scene) {
+    const A = this, T = this.T;
+    // Escudero: robot pesado con gran escudo frontal (arriba)
+    A.make(scene, 'enemy_shielder', 44, 44, c => {
+      A.glow(c, 22, 24, 22, 0x6aa8ff, 0.22);
+      A.ball(c, 22, 27, 12.5, 0x4a5568, 0.5);
+      c.strokeStyle = A.css(0x6aa8ff, 0.9); c.lineWidth = 1.2; c.beginPath(); c.arc(22, 27, 12.5, 0, T); c.stroke();
+      A.rr(c, 12, 30, 20, 8, 3); A.plate(c, 0x3a4252, 0x6aa8ff, 0, 30, 0, 38, 1);
+      A.glow(c, 22, 28, 8, 0xff3a3a, 0.7); A.ball(c, 22, 28, 3.6, 0xff6a6a, 0.8);
+      c.beginPath(); c.arc(22, 24, 19, Math.PI * 1.17, Math.PI * 1.83); c.lineWidth = 8; c.lineCap = 'round';                // el escudo
+      c.strokeStyle = A.lg(c, 4, 4, 40, 18, [[0, 0xdff0ff], [0.5, 0x6aa8ff], [1, 0x1a3a7a]]); c.stroke();
+      c.lineWidth = 1.2; c.strokeStyle = A.css(0xffffff, 0.8); c.beginPath(); c.arc(22, 24, 21.5, Math.PI * 1.2, Math.PI * 1.8); c.stroke();
+      c.fillStyle = A.css(0x9fd0ff, 0.9); for (const a of [1.28, 1.5, 1.72]) { c.beginPath(); c.arc(22 + 19 * Math.cos(a * Math.PI), 24 + 19 * Math.sin(a * Math.PI), 1.3, 0, T); c.fill(); }
+    });
+    // Mortero: base octogonal con tubo inclinado y proyectiles
+    A.make(scene, 'enemy_mortar', 40, 40, c => {
+      A.glow(c, 20, 22, 20, 0xff8a3c, 0.22);
+      A.poly(c, A.ngon(20, 25, 15, 8, Math.PI / 8)); A.plate(c, 0x4a4036, 0xff8a3c, 0, 10, 0, 40, 2);
+      c.fillStyle = A.lg(c, 14, 0, 26, 0, [[0, 0x1c1812], [0.5, 0x8c8272], [1, 0x1a160f]]); A.rr(c, 14.5, 1, 11, 22, 3); c.fill();
+      c.strokeStyle = A.css(0xff8a3c, 0.95); c.lineWidth = 1.5; c.stroke(); c.fillStyle = A.css(0xff8a3c, 0.95); c.fillRect(14.5, 1, 11, 3);
+      A.glow(c, 20, 3, 6, 0xffb060, 0.8);
+      A.ball(c, 20, 26, 8, 0x5a4e40, 0.5);
+      for (const x of [9, 31]) { A.rr(c, x - 2, 24, 4, 9, 2); c.fillStyle = A.lg(c, x, 24, x, 33, [[0, 0xffd060], [1, 0xb0501c]]); c.fill(); }
+      A.glow(c, 20, 26, 5, 0xff5a1c, 0.9);
+    });
+    // Giróscopo: anillos concéntricos con emisores
+    A.make(scene, 'enemy_spinner', 40, 40, c => {
+      A.glow(c, 20, 20, 20, 0xc65cff, 0.3);
+      c.lineWidth = 3.5; c.strokeStyle = A.lg(c, 0, 0, 40, 40, [[0, 0xe8c0ff], [0.5, 0x8a3cd0], [1, 0x3a1070]]); c.beginPath(); c.arc(20, 20, 16, 0, T); c.stroke();
+      c.lineWidth = 1; c.strokeStyle = A.css(0xffffff, 0.6); c.beginPath(); c.arc(20, 20, 18, 0, T); c.stroke();
+      for (let i = 0; i < 3; i++) { const a = i * T / 3 - Math.PI / 2; A.ball(c, 20 + 16 * Math.cos(a), 20 + 16 * Math.sin(a), 3.6, 0xff7aff, 0.7); A.glow(c, 20 + 16 * Math.cos(a), 20 + 16 * Math.sin(a), 6, 0xc65cff, 0.8); }
+      c.strokeStyle = A.css(0xd8b0ff, 0.9); c.lineWidth = 2; for (let i = 0; i < 3; i++) { const a = i * T / 3 - Math.PI / 2; c.beginPath(); c.moveTo(20, 20); c.lineTo(20 + 13 * Math.cos(a), 20 + 13 * Math.sin(a)); c.stroke(); }
+      A.ball(c, 20, 20, 6.2, 0x3a1a60, 0.6); A.glow(c, 20, 20, 7, 0xff7aff, 0.9); A.ball(c, 20, 20, 2.8, 0xffd0ff, 0.9);
+    });
+    // Embestidor: cuña afilada con cuchillas
+    A.make(scene, 'enemy_dasher', 28, 28, c => {
+      A.glow(c, 14, 15, 14, 0xff5c8a, 0.3);
+      A.poly(c, [[14, 1], [20, 14], [27, 25], [14, 20], [1, 25], [8, 14]]); A.plate(c, 0x4a1428, 0xff5c8a, 1, 1, 27, 25, 1.4);
+      c.fillStyle = A.lg(c, 14, 3, 14, 20, [[0, 0xffd0e0], [1, 0xff5c8a]]); A.poly(c, [[14, 3], [17, 13], [14, 17], [11, 13]]); c.fill();
+      c.strokeStyle = A.css(0xffffff, 0.9); c.lineWidth = 1; c.beginPath(); c.moveTo(14, 3); c.lineTo(14, 17); c.stroke();
+      A.glow(c, 14, 23, 6, 0xffa0c0, 0.9);
+    });
+    // Reparador: dron médico con cruz y halo
+    A.make(scene, 'enemy_healer', 36, 36, c => {
+      A.glow(c, 18, 18, 18, 0x5dff8a, 0.3);
+      c.strokeStyle = A.css(0x5dff8a, 0.8); c.lineWidth = 1.6; c.beginPath(); c.arc(18, 18, 15.5, 0.3, 2.6); c.stroke(); c.beginPath(); c.arc(18, 18, 15.5, 3.5, 5.8); c.stroke();
+      for (const sx of [-1, 1]) { c.fillStyle = A.css(0xcfffe0, 0.4); c.strokeStyle = A.css(0x5dff8a, 0.8); c.lineWidth = 0.8; c.beginPath(); c.ellipse(18 + sx * 11, 20, 5, 2.4, sx * 0.4, 0, T); c.fill(); c.stroke(); }
+      A.ball(c, 18, 18, 10.5, 0xe8fff0, 0.55); c.strokeStyle = A.css(0x5dff8a, 0.9); c.lineWidth = 1; c.beginPath(); c.arc(18, 18, 10.5, 0, T); c.stroke();
+      c.fillStyle = A.lg(c, 0, 11, 0, 25, [[0, 0x8fffb0], [1, 0x1fa850]]); c.fillRect(16, 11, 4, 14); c.fillRect(11, 16, 14, 4);
+      c.fillStyle = A.css(0xffffff, 0.7); c.fillRect(16.8, 11.5, 1.2, 13);
+      A.glow(c, 18, 18, 5, 0xffffff, 0.8);
+    });
   },
 });

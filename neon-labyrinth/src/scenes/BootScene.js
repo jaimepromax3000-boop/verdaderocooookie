@@ -393,6 +393,11 @@ class BootScene extends Phaser.Scene {
     });
     this.tex('door_closed', 32, 32, g => { g.fillStyle(0x2a0a14, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(3, 0xff4466, 1); for (let i = 4; i < 32; i += 8) g.lineBetween(i, 2, i, 30); g.lineStyle(2, 0xff4466, 1); g.strokeRect(1, 1, 30, 30); g.fillStyle(0xff4466, 0.2); g.fillRect(1, 1, 30, 30); });
     this.tex('door_locked', 32, 32, g => { g.fillStyle(0x2a2208, 1); g.fillRect(0, 0, 32, 32); g.lineStyle(3, 0xffe94d, 1); g.strokeRect(2, 2, 28, 28); g.fillStyle(0xffe94d, 1); g.fillRect(11, 14, 10, 9); g.lineStyle(3, 0xffe94d, 1); g.strokeCircle(16, 12, 4); });
+    this.tex('door_boss', 32, 32, g => {      // barrera de energía del jefe: se abre al limpiar todas las salas
+      g.fillStyle(0x14061f, 1); g.fillRect(0, 0, 32, 32); g.fillStyle(0xff2bd6, 0.18); g.fillRect(1, 1, 30, 30);
+      g.lineStyle(3, 0xff2bd6, 1); g.strokeRect(1.5, 1.5, 29, 29); g.lineStyle(2, 0xffe94d, 0.9); g.lineBetween(4, 4, 28, 28); g.lineBetween(28, 4, 4, 28);
+      g.fillStyle(0xff2bd6, 1); g.fillCircle(16, 16, 4); g.fillStyle(0xffffff, 1); g.fillCircle(16, 16, 1.6);
+    });
     this.tex('vignette', 4, 4, g => { g.fillStyle(0x000000, 1); g.fillRect(0, 0, 4, 4); });
     this.tex('bg_grid', 64, 64, g => { g.fillStyle(0x000000, 0); g.lineStyle(1, 0xffffff, 0.35); g.lineBetween(0, 0, 64, 0); g.lineBetween(0, 0, 0, 64); g.fillStyle(0xffffff, 0.5); g.fillRect(0, 0, 2, 2); });
   }

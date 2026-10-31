@@ -48,6 +48,8 @@ class UIScene extends Phaser.Scene {
       Bus.on('run:end', e => this.showEnd(e)),
       Bus.on('room:clear', () => this.banner('SALA LIMPIA')),
       Bus.on('boss:phase', e => this.banner(`¡${(e.name || 'EL JEFE').toUpperCase()} SE ENFURECE!`, '#ff2bd6')),
+      Bus.on('boss:unlocked', () => this.banner('¡LA PUERTA DEL JEFE SE ABRE!', '#ff2bd6', 130)),
+      Bus.on('boss:horde', () => this.banner('¡EL JEFE LLAMA REFUERZOS!', '#ff9a3c', 130)),
       Bus.on('boss:dead', () => this.banner('JEFE DERROTADO', '#ffd23c', 130)),
       Bus.on('boss:intro', e => this.banner('JEFE · ' + e.name.toUpperCase(), '#ff2bd6')),
       Bus.on('wave:start', e => this.banner(`OLEADA ${e.wave}/${e.total}`, '#ffe94d')),
@@ -102,7 +104,8 @@ class UIScene extends Phaser.Scene {
     if (this.joy) this.drawTouch();
     this.txtInfo.setText(`¢ ${p.credits}    🔑 ${p.keys}`.replace('🔑', 'LLAVES'));
     const arm = Math.round(Armor.reduction() * 100);
-    this.txtInfo2.setText(`Salas: ${g.roomsCleared}  ·  Mejoras: ${g.upgradesPicked}  ·  Fragmentos al morir: +${Math.round((g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12) * g.diff.reward)}${arm ? `  ·  Armadura ${arm} %` : ''}`);
+    const cp = g.combatProgress();
+    this.txtInfo2.setText(`Salas: ${cp.done}/${cp.total}  ·  Fragmentos al morir: +${Math.round((g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12) * g.diff.reward)}${arm ? `  ·  Armadura ${arm} %` : ''}`);
     this.txtFloor.setText(`PLANTA ${g.floor}/${CFG.FLOORS}  ·  ${this.roomName(g.room)}`);
     this.txtWeapon.setText(`${Meta.shown()}  ·  ${p.weapon.name}  ·  ${g.diff.name}`);
   }
@@ -294,7 +297,7 @@ class UIScene extends Phaser.Scene {
     this.tgfx = this.add.graphics().setDepth(55);
     this.tbtns = [
       { id: 'dash', x: W - 300, y: 574, r: 32, label: 'DASH' }, { id: 'ability', x: W - 334, y: 494, r: 32, label: 'Q' },
-      { id: 'interact', x: W - 290, y: 414, r: 28, label: 'E' }, { id: 'portal', x: W - 226, y: 352, r: 28, label: 'T' }, { id: 'pause', x: W / 2 - 34, y: 84, r: 17, label: 'II' }, { id: 'map', x: W / 2 + 34, y: 84, r: 17, label: 'MAP' },
+      { id: 'interact', x: W - 290, y: 414, r: 28, label: 'E' }, { id: 'pause', x: W / 2 - 34, y: 84, r: 17, label: 'II' }, { id: 'map', x: W / 2 + 34, y: 84, r: 17, label: 'MAP' },
     ];
     this.tbtns.forEach(b => { b.txt = this.add.text(b.x, b.y, b.label, { fontFamily: 'monospace', fontSize: b.r > 20 ? '14px' : '11px', color: '#cffcff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(56); b.id2 = null; });
     this.input.on('pointerdown', p => this.touchDown(p, t));
@@ -452,9 +455,9 @@ class UIScene extends Phaser.Scene {
     const c = this.add.container(0, 0).setDepth(85);
     c.add(this.add.rectangle(0, 0, W, H, 0x02030a, 0.86).setOrigin(0));
     c.add(this.add.text(W / 2, 70, `COFRE DE ${tier.name.toUpperCase()}`, { fontFamily: 'monospace', fontSize: '34px', color: hex, fontStyle: 'bold', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5));
-    const img = this.add.image(W / 2, 168, 'chest_' + e.tier).setScale(2.8);
+    const img = this.add.image(W / 2, 168, 'chest_' + e.tier).setScale(Art.sc('chest_' + e.tier, 3.4));
     c.add(img);
-    this.tweens.add({ targets: img, scale: 3.2, duration: 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: img, scale: img.scaleX * 1.1, y: 160, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const rows = [];
     e.items.forEach((it, i) => {
       const y = 258 + i * 50, col = it.kind === 'skin' ? RARITY_COLOR[(SKINS.find(s => s.id === it.id) || {}).rarity] || 0xffffff : it.kind === 'upgrade' ? 0x5dff8a : it.kind === 'frag' ? 0x00f0ff : 0xffe94d;

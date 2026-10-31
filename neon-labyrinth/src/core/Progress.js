@@ -36,6 +36,7 @@ const CHEST_TIERS = [
 const ENEMY_LABEL = {
   grunt: 'Virus', shooter: 'Centinelas', summoner: 'Invocadores', sniper: 'Francotiradores', tank: 'Blindados',
   bomber: 'Bombas lógicas', blinker: 'Espectros', splitter: 'Fractales', turret: 'Torretas', drone: 'Drones',
+  dasher: 'Embestidores', shielder: 'Escuderos', mortar: 'Morteros', spinner: 'Giróscopos', healer: 'Reparadores',
 };
 
 /** Cofres: devuelven la lista de premios y los aplican al guardado. */
@@ -73,7 +74,8 @@ const Missions = {
   GEN: {
     kill_any: () => { const n = 25 + 5 * Math.floor(Math.random() * 8); return { target: n, text: `Elimina ${n} enemigos`, reward: { coins: 40 + n * 2 } }; },
     kill_type: () => {
-      const type = ['grunt', 'shooter', 'summoner', 'sniper', 'tank', 'bomber', 'blinker', 'splitter'][Math.floor(Math.random() * 8)];
+      const types = ['grunt', 'shooter', 'summoner', 'sniper', 'tank', 'bomber', 'blinker', 'splitter', 'dasher', 'shielder', 'mortar', 'spinner', 'healer'];
+      const type = types[Math.floor(Math.random() * types.length)];
       const n = 5 + Math.floor(Math.random() * 6);
       return { target: n, text: `Elimina ${n} ${ENEMY_LABEL[type]}`, extra: { type }, reward: { coins: 30 + n * 6 } };
     },

@@ -415,6 +415,13 @@ class MenuScene extends Phaser.Scene {
     this.smithSay = this.smithSay || '¡Bienvenido a mi forja virtual! Dame materiales y dime qué pieza quieres. Cuanto mejor el material, más te protege.';
     // ---- el herrero ----
     this.box(24, 112, 244, 488, 0x0a1230, 0x2748ff);
+    const wbg = this.add.image(146, 356, 'forge_bg').setScale(Art.sc('forge_bg', 1)); this.content.add(wbg);
+    const fire = [];                                                                                                                  // llamas del foso (animadas)
+    for (let k = 0; k < 7; k++) {
+      const fl = this.add.image(52 + k * 29, 532, 'flame').setScale(Art.sc('flame', 1.0), Art.sc('flame', 1.0)).setOrigin(0.5, 1).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.85);
+      this.content.add(fl); fire.push(fl);
+    }
+    const coals = this.add.image(146, 532, 'glow').setTint(0xff7a1c).setBlendMode(Phaser.BlendModes.ADD).setScale(7.5, 1.3).setAlpha(0.5); this.content.add(coals);
     const sm = this.add.image(146, 372, 'smith').setScale(Art.sc('smith', 1.3));
     const anvil = this.add.image(200, 484, 'anvil').setScale(Art.sc('anvil', 1.0));
     this.arm = this.add.image(169, 336, 'smith_arm').setOrigin(12 / 90, 12 / 120).setScale(Art.sc('smith_arm', 1.3)).setRotation(-0.5);
@@ -425,6 +432,10 @@ class MenuScene extends Phaser.Scene {
     this.anvilPos = { x: 212, y: 452 };
     this.smithBase = { y: sm.y, sy: sm.scaleY, sx: sm.scaleX };
     const an = x => { this.anim.push(x); return x; };
+    fire.forEach((fl, k) => {
+      an(this.tweens.add({ targets: fl, scaleY: fl.scaleY * (1.5 + (k % 3) * 0.2), scaleX: fl.scaleX * 0.85, alpha: 1, duration: 280 + k * 37, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: k * 60 }));
+    });
+    an(this.tweens.add({ targets: coals, alpha: 0.85, duration: 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));
     an(this.tweens.add({ targets: sm, y: sm.y - 2.5, scaleY: sm.scaleY * 1.012, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));         // respira
     an(this.tweens.add({ targets: visor, alpha: 0.7, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));                                   // visor pulsa
     an(this.tweens.add({ targets: this.arm, rotation: -0.42, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));                            // balanceo del brazo
