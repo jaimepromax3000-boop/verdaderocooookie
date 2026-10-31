@@ -39,8 +39,8 @@ class DungeonGenerator {
 
   generate(floor = 1) {
     const rng = this.rng;
-    const GRID = 7, mid = 3;
-    const target = rng.int(10, 15);
+    const GRID = floor >= 4 ? 9 : 7, mid = GRID >> 1;                       // las plantas profundas son mayores
+    const target = rng.int(10, 15) + Math.min(8, Math.floor((floor - 1) * 0.9));
     const rooms = new Map();
     const make = (gx, gy) => {
       const r = { gx, gy, type: 'combat', doors: { N: false, S: false, W: false, E: false }, locked: false,
@@ -105,7 +105,7 @@ class DungeonGenerator {
     if (treasure) { treasure.type = 'treasure'; treasure.locked = true; }
 
     for (const r of all) r.layout = this.makeLayout(r);
-    return { floor, seed: this.seed, rooms, list: all, start, boss, shop, treasure, key: DungeonGenerator.key, get };
+    return { floor, size: GRID, seed: this.seed, rooms, list: all, start, boss, shop, treasure, key: DungeonGenerator.key, get };
   }
 
   /** Plano de baldosas de la sala: 0 libre, 1 pared, 2 obstáculo. */
@@ -121,7 +121,7 @@ class DungeonGenerator {
     }
     room.hazards = []; room.barrels = [];
     if (room.type !== 'combat' && room.type !== 'boss') return L; // salas especiales: despejadas
-    if (room.type === 'boss') return this.addObstacles(L, rng, room.floor === 2 ? 3 : room.floor === 3 ? 6 : 0);
+    if (room.type === 'boss') return this.addObstacles(L, rng, [0, 3, 6, 11][room.floor % 4]);
 
     const out = this.addObstacles(L, rng, rng.int(0, 11));
     this.placeExtras(room, out, rng);
@@ -140,7 +140,7 @@ class DungeonGenerator {
       }
       return true;
     };
-    if (rng() < [0.22, 0.5, 0.65][Math.min(2, room.floor - 1)]) {
+    if (rng() < [0.22, 0.5, 0.65][room.floor <= 2 ? 0 : room.floor <= 5 ? 1 : 2]) {
       const groups = rng.int(1, room.floor >= 2 ? 3 : 2);
       for (let g = 0; g < groups; g++) for (let tries = 0; tries < 10; tries++) {
         const horiz = rng() < 0.5, w = horiz ? rng.int(3, 6) : rng.int(1, 2), h = horiz ? rng.int(1, 2) : rng.int(3, 5);

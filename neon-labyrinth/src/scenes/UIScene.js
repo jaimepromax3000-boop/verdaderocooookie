@@ -35,6 +35,7 @@ class UIScene extends Phaser.Scene {
     this.gBig = this.add.graphics().setDepth(40);
     this.bigLabels = [];
     this.keyTab = this.input.keyboard.addKey('TAB');
+    if (Settings.mobile) this.buildTouch();
     this.gBoss = this.add.graphics();
     this.bossText = this.add.text(W / 2, H - 42, '', { fontFamily: 'monospace', fontSize: '12px', color: '#ff2bd6' }).setOrigin(0.5);
 
@@ -97,10 +98,12 @@ class UIScene extends Phaser.Scene {
     this.drawBoss(g);
     this.drawBigMap(g);
     this.lowHp(p);
+    if (this.joy) this.drawTouch();
     this.txtInfo.setText(`¢ ${p.credits}    🔑 ${p.keys}`.replace('🔑', 'LLAVES'));
-    this.txtInfo2.setText(`Salas: ${g.roomsCleared}  ·  Mejoras: ${g.upgradesPicked}  ·  Fragmentos al morir: +${Math.round((g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12) * g.diff.reward)}`);
+    const arm = Math.round(Armor.reduction() * 100);
+    this.txtInfo2.setText(`Salas: ${g.roomsCleared}  ·  Mejoras: ${g.upgradesPicked}  ·  Fragmentos al morir: +${Math.round((g.roomsCleared * 2 + (g.floor - 1) * 6 + g.bossesKilled * 12) * g.diff.reward)}${arm ? `  ·  Armadura ${arm} %` : ''}`);
     this.txtFloor.setText(`PLANTA ${g.floor}/${CFG.FLOORS}  ·  ${this.roomName(g.room)}`);
-    this.txtWeapon.setText(`${Meta.data.name}  ·  ${p.weapon.name}  ·  ${g.diff.name}`);
+    this.txtWeapon.setText(`${Meta.shown()}  ·  ${p.weapon.name}  ·  ${g.diff.name}`);
   }
 
   roomName(r) {
@@ -196,9 +199,9 @@ class UIScene extends Phaser.Scene {
   drawMap(game) {
     const g = this.gMap;
     g.clear();
-    const cell = 15, gap = 3, ox = CFG.W - 7 * (cell + gap) - 12, oy = 70;
-    g.fillStyle(0x03050f, 0.6); g.fillRect(ox - 6, oy - 6, 7 * (cell + gap) + 6, 7 * (cell + gap) + 6);
-    g.lineStyle(1, 0x2748ff, 0.8); g.strokeRect(ox - 6, oy - 6, 7 * (cell + gap) + 6, 7 * (cell + gap) + 6);
+    const n = game.dungeon.size || 7, cell = n > 7 ? 12 : 15, gap = n > 7 ? 2 : 3, side = n * (cell + gap) + 6, ox = CFG.W - side - 6, oy = 70;
+    g.fillStyle(0x03050f, 0.6); g.fillRect(ox - 6, oy - 6, side, side);
+    g.lineStyle(1, 0x2748ff, 0.8); g.strokeRect(ox - 6, oy - 6, side, side);
     this.paintMap(g, game, ox, oy, cell, gap, false);
   }
 
@@ -207,9 +210,9 @@ class UIScene extends Phaser.Scene {
     const g = this.gBig;
     g.clear();
     this.bigLabels.forEach(l => l.destroy()); this.bigLabels = [];
-    if (!this.keyTab.isDown || this.overlay) return;
-    const W = CFG.W, H = CFG.H, cell = 46, gap = 14, step = cell + gap, size = 7 * step;
-    const ox = (W - size) / 2 + 20, oy = 105;
+    if (!(this.keyTab.isDown || this.gs.touch.map) || this.overlay) return;
+    const W = CFG.W, H = CFG.H, nn = game.dungeon.size || 7, cell = nn > 7 ? 36 : 46, gap = nn > 7 ? 10 : 14, step = cell + gap, size = nn * step;
+    const ox = (W - size) / 2 + 20, oy = nn > 7 ? 92 : 105;
     g.fillStyle(0x02030a, 0.9); g.fillRect(0, 0, W, H);
     g.lineStyle(2, game.theme.accent, 0.7); g.strokeRect(ox - 20, oy - 20, size + 20, size + 4);
     this.paintMap(g, game, ox, oy, cell, gap, true);
@@ -274,13 +277,88 @@ class UIScene extends Phaser.Scene {
     const g = this.gBoss;
     g.clear();
     const boss = game.enemies.find(e => e.type === 'boss' && !e.dead);
-    this.bossText.setText(boss ? boss.bossInfo.name.toUpperCase() : '').setColor('#' + (boss ? boss.color : 0xff2bd6).toString(16).padStart(6, '0'));
+    this.bossText.setText(boss ? boss.bossName.toUpperCase() : '').setColor('#' + (boss ? boss.color : 0xff2bd6).toString(16).padStart(6, '0'));
     if (!boss) return;
     const w = 420, x = (CFG.W - w) / 2, y = CFG.H - 26;
     g.fillStyle(0x1a0830, 0.9); g.fillRect(x, y, w, 10);
     g.fillStyle(boss.color, 1); g.fillRect(x, y, w * Math.max(0, boss.hp / boss.maxHp), 10);
     g.lineStyle(2, 0xffffff, 0.8); g.strokeRect(x, y, w, 10);
     g.lineStyle(2, 0xffffff, 0.9); for (let i = 1; i < boss.bossInfo.phases; i++) { const tx = x + w * (1 - i / boss.bossInfo.phases) + (boss.bossInfo.phases === 2 ? 0 : 0); g.lineBetween(tx, y - 2, tx, y + 12); }
+  }
+
+  // ---------- controles táctiles (modo móvil / tablet): dos joysticks flotantes + botones ----------
+  buildTouch() {
+    const W = CFG.W, H = CFG.H, t = this.gs.touch;
+    this.joy = { L: { id: null, cx: 130, cy: 520, x: 0, y: 0, on: false }, R: { id: null, cx: W - 130, cy: 520, x: 0, y: 0, on: false }, r: 62 };
+    this.tgfx = this.add.graphics().setDepth(55);
+    this.tbtns = [
+      { id: 'dash', x: W - 300, y: 574, r: 32, label: 'DASH' }, { id: 'ability', x: W - 334, y: 494, r: 32, label: 'Q' },
+      { id: 'interact', x: W - 290, y: 414, r: 28, label: 'E' }, { id: 'pause', x: W / 2 - 34, y: 84, r: 17, label: 'II' }, { id: 'map', x: W / 2 + 34, y: 84, r: 17, label: 'MAP' },
+    ];
+    this.tbtns.forEach(b => { b.txt = this.add.text(b.x, b.y, b.label, { fontFamily: 'monospace', fontSize: b.r > 20 ? '14px' : '11px', color: '#cffcff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(56); b.id2 = null; });
+    this.input.on('pointerdown', p => this.touchDown(p, t));
+    this.input.on('pointermove', p => this.touchMove(p, t));
+    this.input.on('pointerup', p => this.touchUp(p, t));
+    this.input.on('pointerupoutside', p => this.touchUp(p, t));
+  }
+
+  touchBlocked() { return !!(this.cardsUI || this.chestUI || this.overlay); }
+
+  touchDown(p, t) {
+    if (this.touchBlocked()) return;
+    const W = CFG.W;
+    for (const b of this.tbtns) {
+      if (Math.hypot(p.x - b.x, p.y - b.y) <= b.r + 10) {
+        b.id2 = p.id;
+        if (b.id === 'map') t.map = true; else t[b.id] = true;
+        return;
+      }
+    }
+    if (p.y < 110) return;                                   // zona del HUD
+    const side = p.x < W * 0.42 ? this.joy.L : p.x > W * 0.58 ? this.joy.R : null;
+    if (!side || side.id !== null) return;
+    side.id = p.id; side.on = true; side.cx = Phaser.Math.Clamp(p.x, 70, W - 70); side.cy = Phaser.Math.Clamp(p.y, 150, CFG.H - 70); side.x = side.y = 0;
+  }
+
+  touchMove(p, t) {
+    for (const k of ['L', 'R']) {
+      const j = this.joy[k];
+      if (j.id !== p.id) continue;
+      let dx = (p.x - j.cx) / this.joy.r, dy = (p.y - j.cy) / this.joy.r;
+      const m = Math.hypot(dx, dy);
+      if (m > 1) { dx /= m; dy /= m; }
+      j.x = dx; j.y = dy;
+      if (k === 'L') { t.mx = dx; t.my = dy; } else { t.ax = dx; t.ay = dy; }
+    }
+  }
+
+  touchUp(p, t) {
+    for (const k of ['L', 'R']) {
+      const j = this.joy[k];
+      if (j.id !== p.id) continue;
+      j.id = null; j.on = false; j.x = j.y = 0;
+      if (k === 'L') { t.mx = 0; t.my = 0; } else { t.ax = 0; t.ay = 0; }
+    }
+    for (const b of this.tbtns) if (b.id2 === p.id) { b.id2 = null; if (b.id === 'map') t.map = false; }
+  }
+
+  drawTouch() {
+    const g = this.tgfx, r = this.joy.r, blocked = this.touchBlocked();
+    g.clear();
+    if (blocked) { this.tbtns.forEach(b => b.txt.setVisible(false)); return; }
+    this.tbtns.forEach(b => b.txt.setVisible(true));
+    for (const k of ['L', 'R']) {
+      const j = this.joy[k], on = j.on, cx = j.cx, cy = j.cy;
+      g.fillStyle(0x00f0ff, on ? 0.16 : 0.07); g.fillCircle(cx, cy, r);
+      g.lineStyle(2, 0x00f0ff, on ? 0.7 : 0.3); g.strokeCircle(cx, cy, r);
+      g.fillStyle(k === 'R' ? 0xff2bd6 : 0x00f0ff, on ? 0.75 : 0.35); g.fillCircle(cx + j.x * r, cy + j.y * r, r * 0.42);
+    }
+    for (const b of this.tbtns) {
+      const down = b.id2 !== null;
+      g.fillStyle(0x0a1230, 0.7); g.fillCircle(b.x, b.y, b.r);
+      g.lineStyle(2, down ? 0xffffff : 0x00f0ff, down ? 1 : 0.7); g.strokeCircle(b.x, b.y, b.r);
+      if (down) { g.fillStyle(0x00f0ff, 0.3); g.fillCircle(b.x, b.y, b.r); }
+    }
   }
 
   // ---------- elegir mejora (1 de 3) ----------
@@ -337,7 +415,7 @@ class UIScene extends Phaser.Scene {
       const y = 258 + i * 50, col = it.kind === 'skin' ? RARITY_COLOR[(SKINS.find(s => s.id === it.id) || {}).rarity] || 0xffffff : it.kind === 'upgrade' ? 0x5dff8a : it.kind === 'frag' ? 0x00f0ff : 0xffe94d;
       const row = this.add.container(W / 2, y).setAlpha(0);
       row.add(this.add.rectangle(0, 0, 560, 40, 0x0a1230, 0.95).setStrokeStyle(2, col));
-      if (it.kind === 'skin') row.add(this.add.image(-250, 0, 'skin_' + it.id).setScale(0.8));
+      if (it.kind === 'skin') row.add(this.add.image(-250, 0, 'skin_' + it.id).setScale(Art.sc('skin_' + it.id, 0.8)));
       else row.add(this.add.text(-250, 0, { coins: '¢', frag: '◆', upgrade: '▲' }[it.kind] || '?', { fontFamily: 'monospace', fontSize: '22px', color: '#' + col.toString(16).padStart(6, '0'), fontStyle: 'bold' }).setOrigin(0.5));
       row.add(this.add.text(-215, 0, it.label, { fontFamily: 'monospace', fontSize: '17px', color: '#ffffff' }).setOrigin(0, 0.5));
       c.add(row); rows.push(row);
@@ -369,7 +447,7 @@ class UIScene extends Phaser.Scene {
     const c = this.add.container(0, 0).setDepth(90);
     c.add(this.add.rectangle(0, 0, W, H, 0x000000, 0.78).setOrigin(0));
     c.add(this.add.text(W / 2, 120, e.win ? 'SERVIDOR CONQUISTADO' : 'CONEXIÓN PERDIDA', { fontFamily: 'monospace', fontSize: '44px', color: e.win ? '#5dff8a' : '#ff4466', fontStyle: 'bold', stroke: '#000', strokeThickness: 5 }).setOrigin(0.5));
-    c.add(this.add.text(W / 2, 168, `${Meta.data.name}  ·  dificultad ${e.diff}`, { fontFamily: 'monospace', fontSize: '16px', color: '#9fc4ff' }).setOrigin(0.5));
+    c.add(this.add.text(W / 2, 168, `${Meta.shown()}  ·  dificultad ${e.diff}`, { fontFamily: 'monospace', fontSize: '16px', color: '#9fc4ff' }).setOrigin(0.5));
     c.add(this.add.text(W / 2, 215,
       `Planta alcanzada: ${e.floor}/${CFG.FLOORS}\nSalas limpiadas: ${e.rooms}\nEnemigos eliminados: ${e.kills}\n\nFragmentos de Núcleo: +${e.fragments}   (total ${Meta.data.fragments})\nMonedas: +${e.coins}   (total ${Meta.data.coins})\n\nPierdes las mejoras de esta partida;\nconservas fragmentos, monedas y misiones.`,
       { fontFamily: 'monospace', fontSize: '20px', color: '#cffcff', align: 'center', lineSpacing: 4 }).setOrigin(0.5, 0));

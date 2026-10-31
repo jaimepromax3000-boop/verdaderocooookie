@@ -12,7 +12,7 @@ function bootNeonLabyrinth() {
     pixelArt: false,
     antialias: true,
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    input: { activePointers: 1 },
+    input: { activePointers: 4 },
     scene: [BootScene, MenuScene, GameScene, UIScene],
   };
   window.NeonLabyrinth = new Phaser.Game(config);

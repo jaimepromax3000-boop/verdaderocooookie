@@ -21,19 +21,26 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 
 ## Menú principal
 
-- **PARTIDA**: nombre de usuario (se guarda), **skin** (solo estética), **arma** (Estándar, Ligero o Pesado, con su habilidad Q) y **dificultad** (Fácil, Normal, Difícil).
-- **TIENDA**: *Mejoras permanentes* (se pagan con Fragmentos de Núcleo) y *Skins* (se pagan con monedas, o salen en cofres).
+- **PARTIDA**: nombre de usuario (se guarda), **skin** (solo estética), **arma** (Estándar, Ligero o Pesado, con su habilidad Q) y **dificultad** (Fácil, Normal, Difícil: en Difícil los enemigos tienen más vida y hacen +50 % de daño; tu vida no cambia).
+- **TIENDA**: *Mejoras permanentes* (Fragmentos de Núcleo), *Skins* (monedas, o cofres) y *Materiales* (monedas): Cuero polimérico, Hierro binario, Oro cifrado y Diamante cuántico.
+- **HERRERO**: un herrero virtual fabrica tu **armadura permanente** (casco, pechera, pantalones y botas). Eliges pieza y material, le entregas los materiales y ves la animación de forja antes de recibirla. Cada pieza pide una cantidad distinta (botas 4, casco 5, pantalones 6, pechera 8). Protección: Diamante > Oro > Hierro > Cuero; se pueden mezclar y se ven puestas en tu skin. Cada punto de protección reduce un 1,5 % el daño recibido.
 - **MISIONES**: 3 activas ("elimina 10 Blindados", "limpia 6 salas"...). El progreso cuenta entre partidas y se reclama la recompensa (monedas, fragmentos o un cofre).
+- **Ajustes** (engranaje arriba a la derecha): idioma (español, inglés, francés), volumen y controles (ordenador, o móvil/tablet con dos joysticks táctiles y botones de dash, habilidad, interactuar, pausa y mapa).
 
 ## Bucle de juego
 
 - Sala inicial segura: eliges arma inicial (Pulso, Dispersor, Lanza Riel).
-- 3 plantas de 10–15 salas con biomas distintos y un jefe diferente por planta; las puertas se sellan al entrar y se abren al matar a todos los enemigos (algunas salas tienen 2 oleadas).
+- **10 plantas** (de ~12 salas la primera a ~20 la última) con 6 biomas y 6 jefes distintos (los de las plantas 7-9 son versiones Mk II); las puertas se sellan al entrar y se abren al matar a todos los enemigos (algunas salas tienen 2 oleadas).
 - **Al limpiar una sala eliges 1 de 3 mejoras temporales** aleatorias y distintas. Duran una partida y tienen niveles: escudos orbitales, cadencia de fuego (más disparos por segundo, luego doble y triple disparo), campo de fuerza, daño, nanobots, velocidad, esquiva, espinas, campo temporal... 31 en total.
-- **El jefe suelta un cofre** (Bronce / Plata / Oro según el jefe y la dificultad) con monedas, fragmentos, mejoras permanentes o skins. Se abre con E.
+- **El jefe suelta un cofre** (Bronce / Plata / Oro según la planta y la dificultad) con monedas, fragmentos, mejoras permanentes o skins. Se abre con E.
 - Salas especiales: **Tienda** (mejoras temporales con créditos), **Tesoro** oculto (puerta con llave) y **Jefe** en el punto más lejano.
-- Trampas de pinchos con aviso, barriles explosivos, 12 diseños de obstáculos y enemigos variados (Virus, Centinela, Invocador, Dron, Francotirador, Blindado, Bomba lógica, Torreta, Espectro, Fractal) con **élites**.
-- Al morir pierdes lo de la partida; conservas fragmentos, monedas, skins y misiones. La dificultad multiplica las recompensas.
+- Trampas de pinchos con aviso, barriles explosivos, 12 diseños de obstáculos y enemigos variados con **élites**.
+- Al morir pierdes lo de la partida; conservas fragmentos, monedas, skins, materiales, armadura y misiones.
+
+## Controles
+
+PC: WASD/flechas, ratón, Espacio/Shift (dash), Q o clic derecho (habilidad), E (interactuar), Tab (mapa), ESC (pausa).
+Móvil/tablet: joystick izquierdo mover, joystick derecho apuntar y disparar, botones en pantalla.
 
 ## Estructura
 
@@ -44,7 +51,9 @@ src/
 ├── main.js                     configuración de Phaser
 ├── core/
 │   ├── Config.js               constantes, personajes, armas, mejoras permanentes, guardado, RNG con semilla
-│   ├── Progress.js             skins, dificultades, cofres de jefe y misiones
+│   ├── Progress.js             skins, dificultades, cofres, misiones, materiales y armadura
+│   ├── Art.js  ArtParts.js     arte semi-realista con canvas 2D: enemigos, jefes, skins, armadura, herrero
+│   ├── I18n.js                 idiomas ES/EN/FR (glosario + reglas, parche de Phaser Text)
 │   ├── EventBus.js             bus de eventos global (base del sistema de sinergias)
 │   ├── StateMachine.js         FSM genérica para la IA
 │   ├── ObjectPool.js           pool de proyectiles y partículas
@@ -56,7 +65,7 @@ src/
 │   ├── Entity.js  Player.js  Enemy.js  Projectile.js  Item.js
 └── scenes/
     ├── BootScene.js            genera todo el arte por código y carga el guardado
-    ├── MenuScene.js            Partida / Tienda / Misiones
+    ├── MenuScene.js            Partida / Tienda / Herrero / Misiones y ajustes
     ├── GameScene.js            salas, combate, puertas, recompensas
     └── UIScene.js              HUD en paralelo (vida/escudo, minimapa, buffs, módulos)
 ```

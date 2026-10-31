@@ -7,7 +7,7 @@
  */
 class Player extends Entity {
   constructor(scene, x, y, character, weaponId, skinId = 'operator') {
-    super(scene, x, y, 'skin_' + skinId, 11, 1);
+    super(scene, x, y, Art.playerKey(scene, skinId), 11, 1);
     this.wpImg = scene.add.image(x, y, character.wp).setDepth(21);
     this.character = character;
     this.baseTint = 0xffffff;                           // la nave ya trae sus colores
@@ -203,19 +203,23 @@ class Player extends Entity {
   update(dt) {
     if (this.dead) return;
     const k = this.keys2;
+    const mobile = Settings.mobile, tc = this.gs.touch;
     const dir = new Phaser.Math.Vector2(
       (k.d.isDown || k.right.isDown ? 1 : 0) - (k.a.isDown || k.left.isDown ? 1 : 0),
       (k.s.isDown || k.down.isDown ? 1 : 0) - (k.w.isDown || k.up.isDown ? 1 : 0));
-    if (dir.lengthSq()) dir.normalize();
+    if (mobile && (tc.mx || tc.my)) dir.set(tc.mx, tc.my);                // joystick izquierdo (magnitud 0..1)
+    if (dir.lengthSq() > 1) dir.normalize();
 
-    // apuntado con el ratón (coordenadas de mundo)
+    // apuntado: ratón (coordenadas de mundo) o joystick derecho en modo móvil
     const p = this.gs.input.activePointer;
-    this.aimAngle = Math.atan2(p.worldY - this.y, p.worldX - this.x);
+    if (mobile) { if (Math.hypot(tc.ax, tc.ay) > 0.2) this.aimAngle = Math.atan2(tc.ay, tc.ax); }
+    else this.aimAngle = Math.atan2(p.worldY - this.y, p.worldX - this.x);
     this.setRotation(this.aimAngle + Math.PI / 2);
 
-    if (Phaser.Input.Keyboard.JustDown(k.space) || Phaser.Input.Keyboard.JustDown(k.shift)) this.tryDash(dir.clone());
-    const right = p.rightButtonDown();
-    if (Phaser.Input.Keyboard.JustDown(k.q) || (right && !this.prevRight)) this.tryAbility();
+    const dashKey = Phaser.Input.Keyboard.JustDown(k.space) || Phaser.Input.Keyboard.JustDown(k.shift);
+    if (dashKey || (mobile && tc.dash)) { tc.dash = false; this.tryDash(dir.lengthSq() ? dir.clone().normalize() : new Phaser.Math.Vector2()); }
+    const right = !mobile && p.rightButtonDown();
+    if (Phaser.Input.Keyboard.JustDown(k.q) || (right && !this.prevRight) || (mobile && tc.ability)) { tc.ability = false; this.tryAbility(); }
     this.prevRight = right;
 
     if (this.dashT > 0) {
@@ -245,7 +249,8 @@ class Player extends Entity {
     }
     this.iframes = Math.max(0, this.iframes - dt);
     this.fireT -= dt;
-    if ((p.isDown && p.leftButtonDown() || this.gs.autoFire) && this.fireT <= 0 && !this.gs.inputLocked) this.shoot();
+    const wantFire = mobile ? Math.hypot(tc.ax, tc.ay) > 0.35 : (p.isDown && p.leftButtonDown());
+    if ((wantFire || this.gs.autoFire) && this.fireT <= 0 && !this.gs.inputLocked) this.shoot();
 
     // recarga de escudo si lleva un rato sin recibir daño
     this.lastHitT += dt;
@@ -264,6 +269,7 @@ class Player extends Entity {
 
   takeDamage(amount, source, info) {
     if (this.dead || this.iframes > 0) return false;
+    amount *= 1 - Armor.reduction();                  // la armadura permanente reduce el daño recibido
     const dodge = this.stack('dodge');
     if (dodge && !(info && info.silent) && this.gs.rng() < 0.08 * dodge) {   // esquiva: ignora el golpe
       this.iframes = 0.35; this.gs.floatText(this.x, this.y - 22, 'ESQUIVA', 0x5dff8a); return false;

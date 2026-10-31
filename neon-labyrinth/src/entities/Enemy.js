@@ -31,12 +31,21 @@ const BOSS_INFO = [
   { tex: 'enemy_boss1', name: 'Guardián del Servidor', color: 0xff2bd6, phases: 2 },
   { tex: 'enemy_boss2', name: 'Hidra de Datos',        color: 0xff9a3c, phases: 2 },
   { tex: 'enemy_boss3', name: 'Núcleo Corrupto',       color: 0x9b5cff, phases: 3 },
+  { tex: 'enemy_boss4', name: 'Centinela Prisma',      color: 0x00f0ff, phases: 2 },
+  { tex: 'enemy_boss5', name: 'Coloso de Hierro',      color: 0xff4466, phases: 2 },
+  { tex: 'enemy_boss6', name: 'Emperador del Vacío',   color: 0xffd23c, phases: 3 },
 ];
+/** Qué jefe aparece en cada planta (las plantas 7-9 repiten diseños en versión Mk II). */
+const BOSS_BY_FLOOR = [0, 1, 2, 3, 4, 5, 6, 1, 2, 4, 6];
+const bossKindFor = f => BOSS_BY_FLOOR[Math.max(1, Math.min(BOSS_BY_FLOOR.length - 1, f))];
 
 const BOSS_SEQ = {
   1: { 1: ['ring', 'charge', 'ring', 'charge'],                 2: ['spiral', 'summon', 'charge', 'ring'] },
   2: { 1: ['fan', 'charge', 'fan', 'turrets'],                  2: ['fan', 'spiral', 'charge', 'turrets', 'ring'] },
   3: { 1: ['blink', 'ring', 'rain', 'summon'],                  2: ['blink', 'spiral', 'rain', 'fan'], 3: ['blink', 'spiral', 'rain', 'ring', 'fan'] },
+  4: { 1: ['cross', 'fan', 'charge', 'barrage'],                2: ['cross', 'spiral', 'blink', 'barrage'] },
+  5: { 1: ['charge', 'turrets', 'ring', 'barrage'],             2: ['charge', 'rain', 'summon', 'cross'] },
+  6: { 1: ['blink', 'cross', 'rain', 'summon'],                 2: ['barrage', 'spiral', 'blink', 'turrets'], 3: ['blink', 'cross', 'spiral', 'rain', 'barrage', 'ring'] },
 };
 
 /** Afijos de élite: color del aura y efecto. */
@@ -49,12 +58,13 @@ const ELITE_AFFIX = {
 class Enemy extends Entity {
   constructor(scene, x, y, type, scale = 1, variant = null, elite = null) {
     const cfg = ENEMY_TYPES[type];
-    const info = type === 'boss' ? BOSS_INFO[Math.min(3, scene.floor)] : null;
+    const info = type === 'boss' ? BOSS_INFO[bossKindFor(scene.floor)] : null;
     const eliteHp = elite ? (elite === 'armored' ? 2.6 : 2) : 1;
     super(scene, x, y, info ? info.tex : cfg.tex, cfg.r * (elite ? 1.15 : 1), cfg.hp * scale * eliteHp);
     this.type = type;
     this.cfg = cfg;
     this.bossInfo = info;
+    this.bossName = info ? info.name + (scene.floor >= 7 ? ' Mk II' : '') : null;
     this.color = info ? info.color : cfg.color;
     this.elite = elite;
     this.variant = variant;                 // 'cryo' | 'toxic' | null (solo centinelas)
@@ -66,8 +76,9 @@ class Enemy extends Entity {
     this.moveDir = new Phaser.Math.Vector2();
     this.baseTint = type === 'shooter' && variant ? (variant === 'cryo' ? 0x7fe9ff : 0x5dff8a) : 0xffffff;
     this.setTint(this.baseTint).setDepth(10);
-    if (cfg.scale) this.setScale(cfg.scale);
-    if (elite) this.setScale((cfg.scale || 1) * 1.25);
+    const bs = Art.scaleOf(this.texture.key);
+    if (cfg.scale) this.setScale(cfg.scale * bs);
+    if (elite) this.setScale((cfg.scale || 1) * 1.25 * bs);
     this.setAlpha(0.3);
     this.patrolTarget = null;
     this.aiming = 0;
@@ -214,7 +225,7 @@ class Enemy extends Entity {
     const p = this.gs.player;
     this.aimAngle = Math.atan2(p.y - this.y, p.x - this.x);
     if (this.type === 'boss') {
-      const seq = BOSS_SEQ[Math.min(3, this.gs.floor)][this.phase];
+      const seq = BOSS_SEQ[bossKindFor(this.gs.floor)][this.phase];
       this.bossPattern = seq[this.pattern++ % seq.length];
     }
   }
@@ -386,6 +397,26 @@ class Enemy extends Entity {
           if (this.attackStep === 1) { this.attackStep = 2; ring(12, g.rng() * 6, 225); }
           if (t > 1.2) done(0.5);
         }
+        break;
+      }
+      case 'cross': {                                    // cuatro brazos de balas que giran
+        const n = Math.floor(t / 0.13);
+        while (this.attackStep < n && this.attackStep < 16) {
+          const base = this.attackStep * 0.28 + this.aimAngle;
+          for (let k = 0; k < 4; k++) g.fireEnemyBullet(this.x, this.y, base + k * Math.PI / 2, 215, col, null);
+          this.attackStep++;
+        }
+        if (t > 2.3) done(0.7);
+        break;
+      }
+      case 'barrage': {                                  // tres ráfagas rápidas dirigidas al jugador
+        const starts = [0.4, 0.9, 1.4];
+        const burst = Math.floor((t - 0.4) / 0.5);
+        if (t > 0.4 && burst < 3 && this.attackStep < burst * 3 + Math.min(3, Math.floor(((t - 0.4) % 0.5) / 0.1) + 1)) {
+          this.attackStep++;
+          g.fireEnemyBullet(this.x, this.y, Math.atan2(p.y - this.y, p.x - this.x) + (g.rng() - 0.5) * 0.1, 300, col, null);
+        }
+        if (t > 2.0) done(0.6);
         break;
       }
       case 'rain': {                                     // lluvia de balas desde el borde superior

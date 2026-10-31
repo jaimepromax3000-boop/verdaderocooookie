@@ -71,6 +71,7 @@ class GameScene extends Phaser.Scene {
 
     this.keyE = this.input.keyboard.addKey('E');
     this.keyEsc = this.input.keyboard.addKey('ESC');
+    this.touch = { mx: 0, my: 0, ax: 0, ay: 0, dash: false, ability: false, interact: false, pause: false, map: false };   // controles táctiles
     this.input.mouse && this.input.mouse.disableContextMenu();
 
     this.scene.launch('UIScene', { game: this });
@@ -145,7 +146,7 @@ class GameScene extends Phaser.Scene {
     this.rebuildBlocked();
     this.drawDoors();
     this.buildExtras(room);
-    if (room.type === 'boss' && !room.cleared) Bus.emit('boss:intro', { name: BOSS_INFO[Math.min(3, this.floor)].name });
+    if (room.type === 'boss' && !room.cleared) Bus.emit('boss:intro', { name: BOSS_INFO[bossKindFor(this.floor)].name + (this.floor >= 7 ? ' Mk II' : '') });
     Bus.emit('room:enter', { room });
   }
 
@@ -202,17 +203,18 @@ class GameScene extends Phaser.Scene {
       { grunt: 40, shooter: 30, bomber: 12, splitter: 10, turret: 8 },
       { grunt: 22, shooter: 18, summoner: 10, sniper: 12, bomber: 10, splitter: 10, tank: 8, blinker: 10 },
       { grunt: 12, shooter: 14, summoner: 10, sniper: 12, bomber: 10, splitter: 10, tank: 14, blinker: 12, turret: 6 },
-    ][Math.min(2, f - 1)];
+    ][f <= 2 ? 0 : f <= 5 ? 1 : 2];
     const total = Object.values(W).reduce((a, b) => a + b, 0);
     let budget = room.waveBudget[wave - 1], spent = 0, n = 0, eliteDone = wave > 1;
-    while (n < 10 && (spent < budget || n < 2)) {
+    const maxN = 10 + Math.floor(f / 3);
+    while (n < maxN && (spent < budget || n < 2)) {
       let r = rng() * total, type = 'grunt';
       for (const [k, w] of Object.entries(W)) { if ((r -= w) <= 0) { type = k; break; } }
       if (spent + COST[type] > budget + 0.9 && n >= 2) break;
       spent += COST[type]; n++;
       const p = this.randomFreePoint(14, type === 'turret' ? 110 : 150);
       let elite = null;
-      if (!eliteDone && room.dist >= 2 && ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker'].includes(type) && rng() < [0.1, 0.2, 0.3][Math.min(2, f - 1)] * this.diff.elite) {
+      if (!eliteDone && room.dist >= 2 && ['grunt', 'shooter', 'tank', 'sniper', 'splitter', 'blinker'].includes(type) && rng() < Math.min(0.42, 0.1 + 0.035 * (f - 1)) * this.diff.elite) {
         elite = rng.pick(['fast', 'volatile', 'armored']); eliteDone = true;
       }
       this.spawnEnemy(type, p.x, p.y, false, elite);
@@ -264,7 +266,7 @@ class GameScene extends Phaser.Scene {
     if (room.type === 'boss') {
       this.bossesKilled++;
       Meta.data.totals.bosses++; Missions.track('boss');
-      const tier = Math.max(1, Math.min(3, this.floor + this.diff.chest));       // calidad del cofre: jefe + dificultad
+      const tier = Math.max(1, Math.min(3, Math.ceil(this.floor / 3) + this.diff.chest));       // calidad del cofre: jefe + dificultad
       this.addItem('chest', c.x - 60, c.y, { tier });
       this.addItem('portal', c.x + 60, c.y, {});
       this.floatText(c.x, c.y - 60, 'SERVIDOR PURGADO', 0x00f0ff);
@@ -425,7 +427,8 @@ class GameScene extends Phaser.Scene {
 
   updateItems(dt) {
     const p = this.player;
-    const press = Phaser.Input.Keyboard.JustDown(this.keyE);
+    const press = Phaser.Input.Keyboard.JustDown(this.keyE) || this.touch.interact;
+    this.touch.interact = false;
     for (const it of this.items.slice()) {
       if (it.collected) continue;
       it.update(dt);
@@ -800,7 +803,7 @@ class GameScene extends Phaser.Scene {
 
   afterimage(spr) {
     if (this.rng() < 0.5) return;
-    const a = this.add.image(spr.x, spr.y, spr.texture.key).setTint(spr.character ? spr.character.color : 0xffffff).setRotation(spr.rotation).setAlpha(0.5).setDepth(15).setBlendMode(Phaser.BlendModes.ADD);
+    const a = this.add.image(spr.x, spr.y, spr.texture.key).setScale(spr.scaleX).setTint(spr.character ? spr.character.color : 0xffffff).setRotation(spr.rotation).setAlpha(0.5).setDepth(15).setBlendMode(Phaser.BlendModes.ADD);
     this.tweens.add({ targets: a, alpha: 0, duration: 220, onComplete: () => a.destroy() });
   }
 
@@ -828,7 +831,7 @@ class GameScene extends Phaser.Scene {
       const o = ctx.createOscillator(), g = ctx.createGain();
       o.type = P[1]; o.frequency.setValueAtTime(P[0], ctx.currentTime);
       o.frequency.linearRampToValueAtTime(Math.max(40, P[0] + P[4]), ctx.currentTime + P[3]);
-      g.gain.setValueAtTime(P[2], ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + P[3]);
+      g.gain.setValueAtTime(Math.max(0.0001, P[2] * Settings.volume * 1.4), ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + P[3]);
       o.connect(g); g.connect(ctx.destination); o.start(); o.stop(ctx.currentTime + P[3] + 0.02);
     } catch (e) { /* sin audio */ }
   }
@@ -838,7 +841,7 @@ class GameScene extends Phaser.Scene {
   // ===================================================================================
   update(time, delta) {
     if (this.runOver) return;
-    if (Phaser.Input.Keyboard.JustDown(this.keyEsc)) { this.paused = !this.paused; Bus.emit('game:pause', { paused: this.paused }); }
+    if (Phaser.Input.Keyboard.JustDown(this.keyEsc) || this.touch.pause) { this.touch.pause = false; this.paused = !this.paused; Bus.emit('game:pause', { paused: this.paused }); }
     if (this.paused || this.choosing || this.chestOpen) return;
     const dt = Math.min(0.05, delta / 1000);
 

@@ -6,7 +6,7 @@ const CFG = {
   T: 32,                    // tamaño de baldosa
   RW: 30, RH: 17,           // baldosas por sala (960 x 544)
   OX: 32, OY: 64,           // desplazamiento de la sala en pantalla (arriba queda el HUD)
-  FLOORS: 3,                // plantas del servidor (la última tiene el jefe final)
+  FLOORS: 10,               // plantas del servidor (la última tiene el jefe final)
   COL: { cyan: 0x00f0ff, magenta: 0xff2bd6, yellow: 0xffe94d, green: 0x5dff8a, red: 0xff4466, orange: 0xff9a3c, violet: 0x9b5cff, white: 0xffffff },
 };
 
@@ -25,6 +25,9 @@ const THEMES = [
   { name: 'SERVIDORES',    floor: 0x070b1a, grid: 0x12204a, dot: 0x0e1a3d, wall: 0x0b1030, edge: 0x2748ff, edge2: 0x00f0ff, obs: 0x1b0b2e, obsEdge: 0xff2bd6, bg: 0x03040c, accent: 0x00f0ff },
   { name: 'RED NEURONAL',  floor: 0x0d0716, grid: 0x2a1250, dot: 0x24103f, wall: 0x1a0a30, edge: 0x9b5cff, edge2: 0xff2bd6, obs: 0x2a0a22, obsEdge: 0xffe94d, bg: 0x07030c, accent: 0xff2bd6 },
   { name: 'NÚCLEO CENTRAL', floor: 0x140806, grid: 0x3a1608, dot: 0x2a1008, wall: 0x240c08, edge: 0xff9a3c, edge2: 0xff4466, obs: 0x1a0a0a, obsEdge: 0xffe94d, bg: 0x0a0302, accent: 0xff9a3c },
+  { name: 'CIUDAD NEÓN',   floor: 0x06121a, grid: 0x0f3a4a, dot: 0x0b2a38, wall: 0x0a1e2a, edge: 0x00ffd0, edge2: 0xff2bd6, obs: 0x201030, obsEdge: 0x00ffd0, bg: 0x02080c, accent: 0x00ffd0 },
+  { name: 'OCÉANO DE DATOS', floor: 0x04101c, grid: 0x0c3052, dot: 0x0a2640, wall: 0x081c34, edge: 0x3c8cff, edge2: 0x7fe9ff, obs: 0x0a1f3a, obsEdge: 0x5dff8a, bg: 0x020813, accent: 0x3c8cff },
+  { name: 'EL VACÍO',      floor: 0x0a0a10, grid: 0x22224a, dot: 0x181838, wall: 0x12122a, edge: 0x9b5cff, edge2: 0xffe94d, obs: 0x1a1030, obsEdge: 0xffffff, bg: 0x040408, accent: 0xc9a6ff },
 ];
 
 /** Armas básicas que se eligen en la sala segura al empezar cada incursión. */
@@ -56,6 +59,8 @@ const Meta = {
       fragments: 0, coins: 0, upgrades: {}, bestFloor: 0, bestRooms: 0, runs: 0, wins: 0,
       name: 'Operador', skin: 'operator', skins: ['operator'], loadout: 'hacker', difficulty: 1,
       missions: [], totals: { kills: 0, rooms: 0, bosses: 0, chests: 0 },
+      materials: { leather: 0, iron: 0, gold: 0, diamond: 0 },
+      armor: { helmet: null, chest: null, pants: null, boots: null },
     };
   },
   data: null,
@@ -71,11 +76,38 @@ const Meta = {
     if (!d.skins.includes(d.skin)) d.skin = 'operator';
     if (!Array.isArray(d.missions)) d.missions = [];
     if (!d.totals) d.totals = { kills: 0, rooms: 0, bosses: 0, chests: 0 };
+    d.materials = Object.assign({ leather: 0, iron: 0, gold: 0, diamond: 0 }, d.materials || {});
+    d.armor = Object.assign({ helmet: null, chest: null, pants: null, boots: null }, d.armor || {});
     if (typeof Missions !== 'undefined') Missions.ensure();
   },
 
   save() {
     try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* ignorar */ }
+  },
+
+  /** Compra materiales con monedas. */
+  buyMaterial(id, qty) {
+    const m = MATERIALS.find(x => x.id === id), cost = m ? m.price * qty : 0;
+    if (!m || qty < 1 || this.data.coins < cost) return false;
+    this.data.coins -= cost; this.data.materials[id] += qty; this.save();
+    return true;
+  },
+
+  /** El herrero recibe los materiales (se gastan ya); la pieza se entrega al acabar la animación. */
+  forgeStart(slotId, matId) {
+    if (!Armor.canForge(slotId, matId)) return false;
+    this.data.materials[matId] -= Armor.slot(slotId).cost;
+    this.save();
+    return true;
+  },
+
+  forgeFinish(slotId, matId) { this.data.armor[slotId] = matId; this.save(); },
+
+  /** Fabricación inmediata (sin animación). */
+  forge(slotId, matId) {
+    if (!this.forgeStart(slotId, matId)) return false;
+    this.forgeFinish(slotId, matId);
+    return true;
   },
 
   addCoins(n) { this.data.coins += Math.max(0, Math.round(n)); this.save(); },
@@ -85,6 +117,9 @@ const Meta = {
     this.data.name = n || 'Operador';
     this.save();
   },
+
+  /** Nombre del jugador marcado para que el traductor no lo toque. */
+  shown() { return '\u2060' + this.data.name; },
 
   hasSkin(id) { return this.data.skins.includes(id); },
 
@@ -125,6 +160,25 @@ const Meta = {
     if (typeof Missions !== 'undefined') Missions.ensure();
     this.save();
   },
+};
+
+/** Ajustes del jugador: idioma, volumen y tipo de controles (se guardan aparte del progreso). */
+const Settings = {
+  KEY: 'neon-labyrinth-settings',
+  data: { lang: 'es', volume: 0.7, controls: 'pc' },
+  load() {
+    let raw = null;
+    try { raw = localStorage.getItem(this.KEY); } catch (e) { /* sin almacenamiento */ }
+    if (raw) { try { Object.assign(this.data, JSON.parse(raw)); } catch (e) { /* ajustes corruptos */ } return; }
+    // primera vez: idioma del navegador y controles táctiles si el dispositivo no tiene ratón
+    const nl = (navigator.language || 'es').slice(0, 2);
+    if (nl === 'en' || nl === 'fr') this.data.lang = nl;
+    try { if (('ontouchstart' in window || navigator.maxTouchPoints > 0) && !(window.matchMedia && matchMedia('(pointer: fine)').matches)) this.data.controls = 'mobile'; } catch (e) { /* ignorar */ }
+  },
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.data)); } catch (e) { /* ignorar */ } },
+  get lang() { return this.data.lang; },
+  get volume() { return this.data.volume; },
+  get mobile() { return this.data.controls === 'mobile'; },
 };
 
 /** Generador pseudoaleatorio con semilla (mulberry32) para poder repetir mazmorras. */

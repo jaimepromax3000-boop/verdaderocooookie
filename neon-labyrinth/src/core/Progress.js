@@ -82,7 +82,7 @@ const Missions = {
     elite: () => { const n = 2 + Math.floor(Math.random() * 3); return { target: n, text: `Elimina ${n} élites`, reward: { coins: 60 + n * 20, frag: 10 } }; },
     ability: () => { const n = 4 + Math.floor(Math.random() * 7); return { target: n, text: `Usa tu habilidad ${n} veces`, reward: { coins: 40 + n * 5 } }; },
     coins: () => { const n = 30 + 10 * Math.floor(Math.random() * 6); return { target: n, text: `Recoge ${n} créditos en partidas`, reward: { coins: 40 + n } }; },
-    floor: () => { const n = 2 + Math.floor(Math.random() * 2); return { target: n, text: `Llega a la planta ${n}`, reward: { coins: n * 50, frag: n * 8 } }; },
+    floor: () => { const n = 2 + Math.floor(Math.random() * 5); return { target: n, text: `Llega a la planta ${n}`, reward: { coins: n * 50, frag: n * 8 } }; },
     upgrade: () => { const n = 5 + Math.floor(Math.random() * 6); return { target: n, text: `Elige ${n} mejoras de sala`, reward: { coins: 40 + n * 6 } }; },
     win: () => { const diff = 1 + Math.floor(Math.random() * 2); return { target: 1, text: `Completa una partida en ${DIFFICULTIES[diff].name}`, extra: { diff }, reward: { frag: 40 * (diff + 1), chest: diff + 1 } }; },
   },
@@ -136,5 +136,42 @@ const Missions = {
     this.ensure();
     Meta.save();
     return res;
+  },
+};
+
+
+/**
+ * Armadura permanente: 4 piezas x 4 materiales virtuales. Se mezclan libremente.
+ * Los materiales se compran en la TIENDA; el HERRERO fabrica la pieza (cuesta más material la pechera que las botas).
+ * Protección: puntos = puntos de la pieza x nivel del material; cada punto reduce un 1,5 % el daño recibido.
+ */
+const MATERIALS = [
+  { id: 'leather', name: 'Cuero polimérico',  tier: 1, price: 12,  color: 0xb5753a },
+  { id: 'iron',    name: 'Hierro binario',    tier: 2, price: 30,  color: 0xaab4c8 },
+  { id: 'gold',    name: 'Oro cifrado',       tier: 3, price: 70,  color: 0xffd23c },
+  { id: 'diamond', name: 'Diamante cuántico', tier: 4, price: 160, color: 0x7fe9ff },
+];
+const ARMOR_SLOTS = [
+  { id: 'helmet', name: 'Casco',      cost: 5, pts: 1.5 },
+  { id: 'chest',  name: 'Pechera',    cost: 8, pts: 3 },
+  { id: 'pants',  name: 'Pantalones', cost: 6, pts: 2 },
+  { id: 'boots',  name: 'Botas',      cost: 4, pts: 1 },
+];
+
+const Armor = {
+  mat(id) { return MATERIALS.find(m => m.id === id) || null; },
+  slot(id) { return ARMOR_SLOTS.find(s => s.id === id); },
+  tierOf(slotId) { const m = this.mat(Meta.data.armor[slotId]); return m ? m.tier : 0; },
+  /** Puntos de protección de una pieza con ese material. */
+  pieceDef(slotId, matId) { const m = this.mat(matId); return m ? this.slot(slotId).pts * m.tier : 0; },
+  points() { return ARMOR_SLOTS.reduce((a, s) => a + this.pieceDef(s.id, Meta.data.armor[s.id]), 0); },
+  /** Fracción de daño que se evita (0..0,45 con todo de diamante). */
+  reduction() { return Math.min(0.6, this.points() * 0.015); },
+  /** Firma de lo equipado: sirve de nombre de la textura compuesta del jugador. */
+  signature() { return ARMOR_SLOTS.map(s => (Meta.data.armor[s.id] || '-')[0]).join(''); },
+  /** ¿Se puede fabricar esa pieza con ese material? (debe mejorar lo que ya llevas) */
+  canForge(slotId, matId) {
+    const m = this.mat(matId), s = this.slot(slotId);
+    return !!(m && s && m.tier > this.tierOf(slotId) && Meta.data.materials[matId] >= s.cost);
   },
 };

@@ -7,6 +7,7 @@ class Entity extends Phaser.GameObjects.Sprite {
   constructor(scene, x, y, texture, radius, hp) {
     super(scene, x, y, texture);
     scene.add.existing(this);
+    if (Art.scaleOf(texture) !== 1) this.setScale(Art.scaleOf(texture));      // texturas de alta resolución
     this.gs = scene;               // escena de juego (GameScene)
     this.radius = radius;
     this.maxHp = hp;

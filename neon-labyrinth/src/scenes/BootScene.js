@@ -15,6 +15,8 @@ class BootScene extends Phaser.Scene {
   }
 
   create() {
+    Settings.load();
+    I18n.apply();
     Meta.load();
     this.makeTextures();
     this.scene.start('MenuScene');
@@ -47,6 +49,7 @@ class BootScene extends Phaser.Scene {
   }
 
   makeTextures() {
+    Art.build(this);                               // arte semi-realista (canvas): enemigos, jefes, skins, armadura, herrero
     this.makeShips();
     this.makeSkins();
     this.makeWeapons();
