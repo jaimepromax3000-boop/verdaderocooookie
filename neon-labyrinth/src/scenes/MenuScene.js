@@ -57,6 +57,8 @@ class MenuScene extends Phaser.Scene {
   }
 
   rebuild() {
+    if (this.anim) this.anim.forEach(a => { try { if (a.remove) a.remove(); else a.stop(); } catch (e) { /* ya destruido */ } });
+    this.anim = [];
     if (this.content) this.content.destroy();
     this.content = this.add.container(0, 0);
     this.refreshWallet();
@@ -112,7 +114,7 @@ class MenuScene extends Phaser.Scene {
     const sk = SKINS.find(s => s.id === d.skin) || SKINS[0], ld = CHARACTERS.find(c => c.id === d.loadout) || CHARACTERS[0];
     const pkey = Art.playerKey(this, sk.id);
     const pv = this.add.image(190, 330, pkey).setScale(Art.sc(pkey, 3.4));
-    const wp = this.add.image(190, 330 - 48, ld.wp).setScale(2.4);
+    const wp = this.add.image(190 + 14 * 3.4, 330 - 6 * 3.4, ld.wp).setScale(2.6);                  // el arma va en la mano derecha, al costado
     const glow = this.add.image(190, 330, 'glow').setTint(ld.color).setBlendMode(Phaser.BlendModes.ADD).setScale(3).setAlpha(0.4);
     this.content.add([glow, pv, wp]);
     this.tweens.add({ targets: [pv, wp], y: '+=4', duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
@@ -251,7 +253,7 @@ class MenuScene extends Phaser.Scene {
       const name = this.txt(x + 74, y + 7, u.name, 12, '#ffffff', { align: 'center', wordWrap: { width: 140 } }).setOrigin(0.5, 0);
       const info = this.txt(x + 74, y + 40, '', 12, '#5dff8a', { align: 'center' }).setOrigin(0.5, 0);
       bg.on('pointerdown', () => { if (Meta.buy(u)) { this.beep(660); refresh(); } else this.beep(160); });
-      bg.on('pointerover', () => tip.setText(`${u.name}: ${u.desc}${u.req ? '   (requiere: ' + UPGRADES.find(x2 => x2.id === u.req).name + ')' : ''}`));
+      bg.on('pointerover', () => tip.setText(`${u.name}\n${u.desc}${u.req ? '\n(requiere: ' + UPGRADES.find(x2 => x2.id === u.req).name + ')' : ''}`));
       nodes.push({ u, bg, name, info, x, y });
     });
     refresh();
@@ -414,12 +416,27 @@ class MenuScene extends Phaser.Scene {
     // ---- el herrero ----
     this.box(24, 112, 244, 488, 0x0a1230, 0x2748ff);
     const sm = this.add.image(146, 372, 'smith').setScale(Art.sc('smith', 1.3));
-    this.tweens.add({ targets: sm, alpha: 0.88, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     const anvil = this.add.image(200, 484, 'anvil').setScale(Art.sc('anvil', 1.0));
     this.arm = this.add.image(169, 336, 'smith_arm').setOrigin(12 / 90, 12 / 120).setScale(Art.sc('smith_arm', 1.3)).setRotation(-0.5);
-    this.content.add([sm, anvil, this.arm]);
+    const heat = this.add.image(212, 470, 'glow').setTint(0xff7a1c).setBlendMode(Phaser.BlendModes.ADD).setScale(3.2, 1.6).setAlpha(0);      // el yunque se calienta al forjar
+    const visor = this.add.image(146, 309, 'glow').setTint(0xffa030).setBlendMode(Phaser.BlendModes.ADD).setScale(1.5, 0.7).setAlpha(0.4);   // brillo del visor
+    this.content.add([heat, sm, anvil, this.arm, visor]);
+    this.smithSpr = sm; this.anvilSpr = anvil; this.heatSpr = heat; this.visorSpr = visor;
     this.anvilPos = { x: 212, y: 452 };
-    this.box(36, 124, 220, 100, 0x05081a, 0x00f0ff, 1);
+    this.smithBase = { y: sm.y, sy: sm.scaleY, sx: sm.scaleX };
+    const an = x => { this.anim.push(x); return x; };
+    an(this.tweens.add({ targets: sm, y: sm.y - 2.5, scaleY: sm.scaleY * 1.012, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));         // respira
+    an(this.tweens.add({ targets: visor, alpha: 0.7, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));                                   // visor pulsa
+    an(this.tweens.add({ targets: this.arm, rotation: -0.42, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' }));                            // balanceo del brazo
+    an(this.time.addEvent({ delay: 3200, loop: true, callback: () => { if (!visor.active) return; this.tweens.add({ targets: visor, alpha: 0.05, duration: 70, yoyo: true, repeat: 2 }); } }));   // parpadeo
+    an(this.time.addEvent({ delay: 170, loop: true, callback: () => {                                                                                     // brasas que suben de la forja
+      if (!this.content || !this.content.active) return;
+      const sp = this.add.image(150 + Math.random() * 110, 505, 'spark').setBlendMode(Phaser.BlendModes.ADD).setTint(Math.random() < 0.5 ? 0xff7a1c : 0xffd060).setScale(0.35 + Math.random() * 0.5).setAlpha(0.9);
+      this.content.add(sp);
+      this.tweens.add({ targets: sp, y: sp.y - 70 - Math.random() * 90, x: sp.x + (Math.random() - 0.5) * 40, alpha: 0, duration: 1100 + Math.random() * 700, onComplete: () => sp.destroy() });
+    } }));
+    const bbox = this.box(36, 124, 220, 100, 0x05081a, 0x00f0ff, 1);
+    this.bubbleBox = bbox;
     this.bubble = this.txt(44, 130, this.smithSay, 12, '#cffcff', { wordWrap: { width: 204 } });
     this.box(40, 576, 212, 12, 0x08122e, 0x2748ff, 1);
     this.bar = this.add.rectangle(40, 576, 0, 12, 0x00f0ff).setOrigin(0); this.content.add(this.bar);
@@ -461,15 +478,41 @@ class MenuScene extends Phaser.Scene {
     this.txt(728, 568, 'Compra materiales en la TIENDA', 11, '#6f86c9');
   }
 
-  smithTalk(msg) { this.smithSay = msg; if (this.bubble && this.bubble.active) this.bubble.setText(msg); }
+  smithTalk(msg) {
+    this.smithSay = msg;
+    if (this.bubble && this.bubble.active) {
+      this.bubble.setText(msg);
+      if (this.bubbleBox && this.bubbleBox.active) { this.tweens.killTweensOf(this.bubbleBox); this.bubbleBox.setScale(1); this.tweens.add({ targets: this.bubbleBox, scaleX: 1.035, scaleY: 1.06, duration: 110, yoyo: true }); }
+    }
+  }
+
+  /** Reacciones del herrero: 'no' (niega con la cabeza), 'nod' (asiente) y 'cheer' (celebra). */
+  smithReact(kind) {
+    const sm = this.smithSpr;
+    if (!sm || !sm.active) return;
+    if (kind === 'no') this.tweens.add({ targets: sm, angle: { from: -4, to: 4 }, duration: 90, yoyo: true, repeat: 3, onComplete: () => sm.setAngle(0) });
+    else if (kind === 'nod') this.tweens.add({ targets: sm, y: this.smithBase.y + 7, duration: 120, yoyo: true, repeat: 1 });
+    else if (kind === 'cheer') {
+      this.tweens.add({ targets: sm, y: this.smithBase.y - 16, duration: 180, yoyo: true, repeat: 2, ease: 'Quad.easeOut' });
+      if (this.arm && this.arm.active) this.tweens.add({ targets: this.arm, rotation: -1.5, duration: 220, yoyo: true, hold: 500 });
+      for (let i = 0; i < 26; i++) {                                                           // confeti de chispas de colores
+        const sp = this.add.image(this.anvilPos.x, this.anvilPos.y - 20, 'spark').setBlendMode(Phaser.BlendModes.ADD).setTint([0x00f0ff, 0xff2bd6, 0xffe94d, 0x5dff8a][i % 4]).setScale(0.8 + Math.random()).setDepth(62);
+        const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.4, v = 80 + Math.random() * 130;
+        this.tweens.add({ targets: sp, x: sp.x + Math.cos(a) * v, y: sp.y + Math.sin(a) * v + 50, alpha: 0, duration: 900, ease: 'Quad.easeOut', onComplete: () => sp.destroy() });
+      }
+    }
+  }
 
   startForge(slotId, matId) {
     if (this.forging) return;
     const sl = Armor.slot(slotId), m = Armor.mat(matId);
-    if (m.tier <= Armor.tierOf(slotId)) { this.smithTalk(`Tu ${sl.name.toLowerCase()} ya es de ese material o mejor. Elige un material superior.`); this.beep(160); return; }
-    if (!Armor.canForge(slotId, matId)) { this.smithTalk(`Te faltan materiales: ${sl.name.toLowerCase()} de ${m.name} necesita ${sl.cost} unidades. Cómpralas en la TIENDA.`); this.beep(160); return; }
+    if (m.tier <= Armor.tierOf(slotId)) { this.smithReact('no'); this.smithTalk(`Tu ${sl.name.toLowerCase()} ya es de ese material o mejor. Elige un material superior.`); this.beep(160); return; }
+    if (!Armor.canForge(slotId, matId)) { this.smithReact('no'); this.smithTalk(`Te faltan materiales: ${sl.name.toLowerCase()} de ${m.name} necesita ${sl.cost} unidades. Cómpralas en la TIENDA.`); this.beep(160); return; }
     Meta.forgeStart(slotId, matId);                       // el herrero recibe los materiales
     this.forging = true;
+    this.smithReact('nod');
+    if (this.bar && this.bar.active) this.bar.setFillStyle(m.color);
+    this.tweens.add({ targets: this.heatSpr, alpha: 0.65, duration: 2600, delay: 900 });
     this.smithTalk(`Recibido: ${sl.cost} de ${m.name}. ¡Voy a forjar tu ${sl.name.toLowerCase()}!`);
     const ax = this.anvilPos.x, ay = this.anvilPos.y, col = m.color;
     // 1) los materiales vuelan al yunque
@@ -500,6 +543,8 @@ class MenuScene extends Phaser.Scene {
       const piece = this.add.image(ax, ay - 20, `ar_${slotId}_${matId}`).setScale(0).setDepth(61);
       this.tweens.add({ targets: piece, scale: Art.sc(`ar_${slotId}_${matId}`, 1.9), duration: 260, ease: 'Back.easeOut', onComplete: () => {
         this.smithTalk(`¡Listo! Aquí tienes tu ${sl.name.toLowerCase()} de ${m.name}. ¡Te sienta genial!`);
+        this.smithReact('cheer');
+        if (this.heatSpr && this.heatSpr.active) this.tweens.add({ targets: this.heatSpr, alpha: 0, duration: 900 });
         this.tweens.add({ targets: piece, x: this.previewPos.x, y: this.previewPos.y, scale: Art.sc(`ar_${slotId}_${matId}`, 0.9), duration: 700, delay: 350, ease: 'Cubic.easeInOut', onComplete: () => { piece.destroy(); this.finishForge(slotId, matId); } });
       } });
     });
@@ -507,6 +552,8 @@ class MenuScene extends Phaser.Scene {
 
   strike(x, y, col, k) {
     this.beep(180 + (k % 3) * 40); this.cameras.main.shake(70, 0.003);
+    if (this.smithSpr && this.smithSpr.active) this.tweens.add({ targets: this.smithSpr, scaleY: this.smithBase.sy * 0.975, scaleX: this.smithBase.sx * 1.015, duration: 70, yoyo: true });
+    if (this.anvilSpr && this.anvilSpr.active) { this.anvilSpr.setTint(0xfff0c0); this.time.delayedCall(80, () => { if (this.anvilSpr && this.anvilSpr.active) this.anvilSpr.clearTint(); }); }
     for (let i = 0; i < 12; i++) {
       const sp = this.add.image(x, y, 'spark').setBlendMode(Phaser.BlendModes.ADD).setTint(i % 3 ? col : 0xffe9a0).setScale(0.5 + Math.random()).setDepth(60);
       const a = -Math.PI / 2 + (Math.random() - 0.5) * 2.6, v = 40 + Math.random() * 90;

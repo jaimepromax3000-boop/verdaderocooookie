@@ -484,7 +484,8 @@ class Enemy extends Entity {
     if (this.dead) return;
     this.dead = true;
     const g = this.gs;
-    const big = this.type === 'boss';
+    if (this.type === 'boss') { g.bossDeath(this); return; }          // los jefes mueren con una secuencia animada
+    const big = false;
     g.spawnBurst(this.x, this.y, this.color, big ? 50 : this.elite ? 24 : 14);
     g.ringFx(this.x, this.y, big ? 120 : this.elite ? 50 : 28, this.color);
     if (big) {

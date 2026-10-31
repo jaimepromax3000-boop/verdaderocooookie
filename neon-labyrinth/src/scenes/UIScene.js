@@ -48,6 +48,7 @@ class UIScene extends Phaser.Scene {
       Bus.on('run:end', e => this.showEnd(e)),
       Bus.on('room:clear', () => this.banner('SALA LIMPIA')),
       Bus.on('boss:phase', e => this.banner(`¡${(e.name || 'EL JEFE').toUpperCase()} SE ENFURECE!`, '#ff2bd6')),
+      Bus.on('boss:dead', () => this.banner('JEFE DERROTADO', '#ffd23c', 130)),
       Bus.on('boss:intro', e => this.banner('JEFE · ' + e.name.toUpperCase(), '#ff2bd6')),
       Bus.on('wave:start', e => this.banner(`OLEADA ${e.wave}/${e.total}`, '#ffe94d')),
       Bus.on('floor:new', e => this.banner(`PLANTA ${e.floor} · ${e.theme.name}`, '#' + e.theme.accent.toString(16).padStart(6, '0'))),
@@ -293,7 +294,7 @@ class UIScene extends Phaser.Scene {
     this.tgfx = this.add.graphics().setDepth(55);
     this.tbtns = [
       { id: 'dash', x: W - 300, y: 574, r: 32, label: 'DASH' }, { id: 'ability', x: W - 334, y: 494, r: 32, label: 'Q' },
-      { id: 'interact', x: W - 290, y: 414, r: 28, label: 'E' }, { id: 'pause', x: W / 2 - 34, y: 84, r: 17, label: 'II' }, { id: 'map', x: W / 2 + 34, y: 84, r: 17, label: 'MAP' },
+      { id: 'interact', x: W - 290, y: 414, r: 28, label: 'E' }, { id: 'portal', x: W - 226, y: 352, r: 28, label: 'T' }, { id: 'pause', x: W / 2 - 34, y: 84, r: 17, label: 'II' }, { id: 'map', x: W / 2 + 34, y: 84, r: 17, label: 'MAP' },
     ];
     this.tbtns.forEach(b => { b.txt = this.add.text(b.x, b.y, b.label, { fontFamily: 'monospace', fontSize: b.r > 20 ? '14px' : '11px', color: '#cffcff', fontStyle: 'bold' }).setOrigin(0.5).setDepth(56); b.id2 = null; });
     this.input.on('pointerdown', p => this.touchDown(p, t));
@@ -361,43 +362,87 @@ class UIScene extends Phaser.Scene {
     }
   }
 
-  // ---------- elegir mejora (1 de 3) ----------
+  // ---------- elegir mejora (1 de 3): cartas de cristal con icono, brillo y animaciones ----------
   showCards(cards) {
     if (this.cardsUI) return;
-    const W = CFG.W, H = CFG.H, cw = 262, gap = 28, x0 = (W - (cw * 3 + gap * 2)) / 2, y0 = 150, ch = 340;
+    const W = CFG.W, H = CFG.H, cw = 262, ch = 340, gap = 28, x0 = (W - (cw * 3 + gap * 2)) / 2, y0 = 148;
     const c = this.add.container(0, 0).setDepth(80);
-    c.add(this.add.rectangle(0, 0, W, H, 0x02030a, 0.82).setOrigin(0));
-    c.add(this.add.text(W / 2, 78, 'SALA LIMPIA', { fontFamily: 'monospace', fontSize: '15px', color: '#6f86c9' }).setOrigin(0.5));
-    c.add(this.add.text(W / 2, 108, 'ELIGE UNA MEJORA', { fontFamily: 'monospace', fontSize: '32px', color: '#00f0ff', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5));
+    const dim = this.add.rectangle(0, 0, W, H, 0x02030a, 0).setOrigin(0); c.add(dim);
+    this.tweens.add({ targets: dim, fillAlpha: 0.86, duration: 260 });
+    const lab = this.add.text(W / 2, 74, 'SALA LIMPIA', { fontFamily: 'monospace', fontSize: '15px', color: '#6f86c9' }).setOrigin(0.5).setAlpha(0);
+    const title = this.add.text(W / 2, 106, 'ELIGE UNA MEJORA', { fontFamily: 'monospace', fontSize: '32px', color: '#00f0ff', fontStyle: 'bold', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setAlpha(0).setScale(1.25);
+    const line = this.add.rectangle(W / 2, 128, 0, 3, 0x00f0ff, 0.9);
+    c.add([lab, title, line]);
+    this.tweens.add({ targets: lab, alpha: 1, duration: 300 });
+    this.tweens.add({ targets: title, alpha: 1, scale: 1, duration: 340, ease: 'Back.easeOut' });
+    this.tweens.add({ targets: line, width: 420, duration: 480, delay: 120, ease: 'Cubic.easeOut' });
+    this.cardsUI = { c, cards, items: [], locked: false };
+
     cards.forEach((cd, i) => {
-      const x = x0 + i * (cw + gap), col = cd.color, hex = '#' + col.toString(16).padStart(6, '0');
-      const card = this.add.container(x, y0);
-      const bg = this.add.rectangle(0, 0, cw, ch, 0x0a1230, 0.96).setOrigin(0).setStrokeStyle(3, col).setInteractive({ useHandCursor: true });
-      const ring = this.add.graphics();
-      ring.fillStyle(col, 0.18); ring.fillCircle(cw / 2, 78, 44); ring.lineStyle(3, col, 1); ring.strokeCircle(cw / 2, 78, 44);
-      const letter = this.add.text(cw / 2, 78, cd.letter, { fontFamily: 'monospace', fontSize: '44px', color: hex, fontStyle: 'bold' }).setOrigin(0.5);
-      const name = this.add.text(cw / 2, 148, cd.name, { fontFamily: 'monospace', fontSize: '18px', color: '#ffffff', fontStyle: 'bold', align: 'center', wordWrap: { width: cw - 24 } }).setOrigin(0.5, 0);
+      const col = cd.color, hex = '#' + col.toString(16).padStart(6, '0'), x = x0 + i * (cw + gap) + cw / 2, cy = y0 + ch / 2;
+      const bgKey = Art.cardBg(this, col), icoKey = Art.icon(this, cd.id, col);
+      const card = this.add.container(x, cy + 70).setAlpha(0).setRotation(i === 1 ? 0 : (i - 1) * 0.09);
+      const glow = this.add.image(0, 0, 'glow').setTint(col).setBlendMode(Phaser.BlendModes.ADD).setScale(7.2, 8.6).setAlpha(0.12);
+      const bg = this.add.image(0, 0, bgKey).setScale(Art.sc(bgKey, 1));
+      const ico = this.add.image(0, -88, icoKey).setScale(Art.sc(icoKey, 1.1));
+      const icoGlow = this.add.image(0, -88, 'glow').setTint(col).setBlendMode(Phaser.BlendModes.ADD).setScale(2.4).setAlpha(0.5);
+      const tag = cd.level === 1 ? 'NUEVA' : `NIVEL ${cd.level}/${cd.max}`;
+      const pill = this.add.rectangle(0, -142 + 8, 96, 20, col, 0.22).setStrokeStyle(1.5, col, 1);
+      const lvl = this.add.text(0, -134, tag, { fontFamily: 'monospace', fontSize: '11px', color: hex, fontStyle: 'bold' }).setOrigin(0.5);
+      const name = this.add.text(0, -22, cd.name, { fontFamily: 'monospace', fontSize: '19px', color: '#ffffff', fontStyle: 'bold', align: 'center', wordWrap: { width: cw - 36 }, stroke: '#000', strokeThickness: 3 }).setOrigin(0.5);
       const pips = this.add.graphics();
-      for (let k = 0; k < cd.max; k++) { pips.fillStyle(k < cd.level ? col : 0x1a2450, 1); pips.fillRect(cw / 2 - cd.max * 9 + k * 18, 196, 14, 6); }
-      const lvl = this.add.text(cw / 2, 208, cd.level === 1 ? 'NUEVA' : `NIVEL ${cd.level}/${cd.max}`, { fontFamily: 'monospace', fontSize: '12px', color: hex }).setOrigin(0.5, 0);
-      const desc = this.add.text(cw / 2, 238, cd.desc, { fontFamily: 'monospace', fontSize: '14px', color: '#cffcff', align: 'center', wordWrap: { width: cw - 36 } }).setOrigin(0.5, 0);
-      const key = this.add.text(cw / 2, ch - 22, `[${i + 1}]`, { fontFamily: 'monospace', fontSize: '14px', color: '#6f86c9' }).setOrigin(0.5);
-      bg.on('pointerover', () => { bg.setFillStyle(0x14234f, 1); this.tweens.add({ targets: card, y: y0 - 8, duration: 120 }); });
-      bg.on('pointerout', () => { bg.setFillStyle(0x0a1230, 0.96); this.tweens.add({ targets: card, y: y0, duration: 120 }); });
-      bg.on('pointerdown', () => this.choose(cd.id));
-      card.add([bg, ring, letter, name, pips, lvl, desc, key]);
-      card.setAlpha(0).setScale(0.92);
-      this.tweens.add({ targets: card, alpha: 1, scale: 1, duration: 220, delay: 90 * i });
+      for (let k = 0; k < cd.max; k++) { const px = -cd.max * 9 + k * 18; pips.fillStyle(k < cd.level ? col : 0x1a2450, 1); pips.fillRoundedRect(px, 14, 14, 7, 3); if (k < cd.level) { pips.fillStyle(0xffffff, 0.45); pips.fillRect(px + 2, 15, 10, 2); } }
+      const desc = this.add.text(0, 90, cd.desc, { fontFamily: 'monospace', fontSize: '13px', color: '#d8f4ff', align: 'center', wordWrap: { width: cw - 44 }, lineSpacing: 1 }).setOrigin(0.5);
+      const key = this.add.text(0, ch / 2 - 24, `[${i + 1}]`, { fontFamily: 'monospace', fontSize: '14px', color: '#8aa0d8', fontStyle: 'bold' }).setOrigin(0.5);
+      const hit = this.add.rectangle(0, 0, cw - 12, ch - 12, 0x000000, 0.001).setInteractive({ useHandCursor: true });
+      card.add([glow, bg, icoGlow, ico, pill, lvl, name, pips, desc, key, hit]);
       c.add(card);
+      this.tweens.add({ targets: card, alpha: 1, y: cy, rotation: 0, duration: 480, delay: 160 + i * 130, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: [ico, icoGlow], y: '-=5', duration: 1300 + i * 120, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.tweens.add({ targets: icoGlow, alpha: 0.2, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: i * 200 });
+      const sparkle = this.time.addEvent({ delay: 260, loop: true, callback: () => {                       // chispas que suben dentro de la carta
+        if (!card.active) return;
+        const sp = this.add.image(Phaser.Math.Between(-100, 100), 100, 'spark').setBlendMode(Phaser.BlendModes.ADD).setTint(col).setScale(0.5 + Math.random() * 0.6).setAlpha(0.8);
+        card.add(sp); card.sendToBack(sp); card.moveTo(sp, 1);
+        this.tweens.add({ targets: sp, y: -110, alpha: 0, duration: 1800, onComplete: () => sp.destroy() });
+      } });
+      const item = { card, glow, id: cd.id, col, sparkle, base: cy };
+      this.cardsUI.items.push(item);
+      hit.on('pointerover', () => { if (this.cardsUI.locked) return; this.tweens.add({ targets: card, y: cy - 12, scale: 1.045, duration: 140, ease: 'Sine.easeOut' }); this.tweens.add({ targets: glow, alpha: 0.5, duration: 160 });
+        this.cardsUI.items.forEach(o => { if (o !== item) this.tweens.add({ targets: o.card, alpha: 0.6, duration: 140 }); }); });
+      hit.on('pointerout', () => { if (this.cardsUI.locked) return; this.tweens.add({ targets: card, y: cy, scale: 1, duration: 140 }); this.tweens.add({ targets: glow, alpha: 0.12, duration: 160 });
+        this.cardsUI.items.forEach(o => this.tweens.add({ targets: o.card, alpha: 1, duration: 140 })); });
+      hit.on('pointerdown', () => this.choose(cd.id));
     });
-    this.cardsUI = { c, cards };
   }
 
   choose(id) {
-    if (!this.cardsUI) return;
-    this.cardsUI.c.destroy();
-    this.cardsUI = null;
-    this.gs.pickUpgrade(id);
+    const ui = this.cardsUI;
+    if (!ui || ui.locked) return;
+    ui.locked = true;
+    ui.items.forEach(o => {
+      o.sparkle.remove();
+      if (o.id !== id) { this.tweens.add({ targets: o.card, alpha: 0, y: o.base + 50, scale: 0.88, duration: 320, ease: 'Cubic.easeIn' }); return; }
+      const col = o.col;
+      this.tweens.killTweensOf(o.card);
+      this.tweens.add({ targets: o.card, scale: 1.14, y: o.base - 6, alpha: 1, duration: 200, ease: 'Back.easeOut' });
+      this.tweens.add({ targets: o.glow, alpha: 0.95, scale: o.glow.scaleX * 1.3, duration: 260 });
+      const flash = this.add.rectangle(o.card.x, o.base, 262, 340, 0xffffff, 0.8).setBlendMode(Phaser.BlendModes.ADD); ui.c.add(flash);
+      this.tweens.add({ targets: flash, alpha: 0, duration: 420, onComplete: () => flash.destroy() });
+      const ring = this.add.circle(o.card.x, o.base - 88, 20, col, 0).setStrokeStyle(4, col, 1).setBlendMode(Phaser.BlendModes.ADD); ui.c.add(ring);
+      this.tweens.add({ targets: ring, radius: 190, alpha: 0, duration: 520, ease: 'Cubic.easeOut', onComplete: () => ring.destroy() });
+      for (let k = 0; k < 24; k++) {                                                                       // estallido de partículas
+        const sp = this.add.image(o.card.x, o.base - 40, 'spark').setBlendMode(Phaser.BlendModes.ADD).setTint(k % 3 ? col : 0xffffff).setScale(0.8 + Math.random() * 1.2); ui.c.add(sp);
+        const a = Math.random() * 6.283, v = 90 + Math.random() * 200;
+        this.tweens.add({ targets: sp, x: sp.x + Math.cos(a) * v, y: sp.y + Math.sin(a) * v, alpha: 0, duration: 560, ease: 'Quad.easeOut', onComplete: () => sp.destroy() });
+      }
+    });
+    this.time.delayedCall(560, () => {
+      if (!this.cardsUI) return;
+      this.tweens.add({ targets: ui.c, alpha: 0, duration: 200, onComplete: () => { ui.c.destroy(); } });
+      this.cardsUI = null;
+      this.gs.pickUpgrade(id);
+    });
   }
 
   // ---------- cofre de jefe ----------

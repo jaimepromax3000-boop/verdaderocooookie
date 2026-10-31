@@ -71,7 +71,9 @@ class GameScene extends Phaser.Scene {
 
     this.keyE = this.input.keyboard.addKey('E');
     this.keyEsc = this.input.keyboard.addKey('ESC');
-    this.touch = { mx: 0, my: 0, ax: 0, ay: 0, dash: false, ability: false, interact: false, pause: false, map: false };   // controles táctiles
+    this.keyT = this.input.keyboard.addKey('T');                    // activa el generador de portal
+    this.travelling = false; this.slowmo = 1;
+    this.touch = { mx: 0, my: 0, ax: 0, ay: 0, dash: false, ability: false, interact: false, portal: false, pause: false, map: false };   // controles táctiles
     this.input.mouse && this.input.mouse.disableContextMenu();
 
     this.scene.launch('UIScene', { game: this });
@@ -268,14 +270,14 @@ class GameScene extends Phaser.Scene {
       Meta.data.totals.bosses++; Missions.track('boss');
       const tier = Math.max(1, Math.min(3, Math.ceil(this.floor / 8) + this.diff.chest));       // calidad del cofre: jefe + dificultad
       this.addItem('chest', c.x - 60, c.y, { tier });
-      this.addItem('portal', c.x + 60, c.y, {});
+      this.dropGenerator(c.x + 70, c.y);
       this.floatText(c.x, c.y - 60, 'SERVIDOR PURGADO', 0x00f0ff);
       this.cameras.main.flash(300, 0, 240, 255);
     } else {
       this.dropReward(c.x, c.y);
     }
     Bus.emit('room:clear', { room });
-    if (room.type === 'combat' || room.type === 'boss') this.time.delayedCall(650, () => this.offerUpgrades());
+    if (room.type === 'combat' || room.type === 'boss') this.time.delayedCall(room.type === 'boss' ? 2600 : 650, () => this.offerUpgrades());   // en el jefe, primero se ve caer el generador
   }
 
   /** Recompensa visible al limpiar una sala: créditos, salud, llave o módulo de software. */
@@ -428,7 +430,8 @@ class GameScene extends Phaser.Scene {
   updateItems(dt) {
     const p = this.player;
     const press = Phaser.Input.Keyboard.JustDown(this.keyE) || this.touch.interact;
-    this.touch.interact = false;
+    const tPress = Phaser.Input.Keyboard.JustDown(this.keyT) || this.touch.portal;
+    this.touch.interact = false; this.touch.portal = false;
     for (const it of this.items.slice()) {
       if (it.collected) continue;
       it.update(dt);
@@ -436,6 +439,17 @@ class GameScene extends Phaser.Scene {
       const mag = p.stack('magnet');
       if (mag && it.auto && !(it.kind === 'heart' && p.hp >= p.maxHp) && d < 70 + 70 * mag && d > 1) {   // imán
         it.x += (p.x - it.x) / d * 260 * dt; it.baseY += (p.y - it.baseY) / d * 260 * dt;
+      }
+      if (it.kind === 'generator') {                            // se activa con T (o con el botón en móvil)
+        const near = d < 70;
+        if (it.label) it.label.setColor(near ? '#ffe94d' : '#cffcff');
+        if (near && tPress && !it.activated) this.activateGenerator(it);
+        continue;
+      }
+      if (it.kind === 'portal') {                               // se atraviesa caminando hacia él
+        if (this.time.now % 3 === 0 && !this.travelling) { const a = this.rng() * 6.283; this.spark(it.x + Math.cos(a) * 46, it.baseY + Math.sin(a) * 46, this.rng() < 0.5 ? 0x00f0ff : 0xff2bd6, 0.9); }
+        if (d < 30 && !this.travelling && this.time.now > (it.lock || 0)) this.tryEnterPortal(it);
+        continue;
       }
       if (it.auto && d < 24) { this.collect(it); continue; }
       if (!it.auto) {
@@ -473,11 +487,6 @@ class GameScene extends Phaser.Scene {
         this.sfx('module');
         Bus.emit('player:weapon', { weapon: p.weapon });
         break;
-      case 'portal': {
-        const chest = this.items.find(o => o.kind === 'chest' && !o.collected);
-        if (chest) { this.floatText(it.x, it.y - 30, '¡Abre antes el cofre!', 0xffd23c); this.collect(chest); return; }   // el cofre se abre siempre antes de salir
-        this.nextFloor(); break;
-      }
     }
     Bus.emit('player:inventory', {});
     it.remove();
@@ -581,6 +590,121 @@ class GameScene extends Phaser.Scene {
     for (let i = 1; i < 5; i++) g.lineTo(x1 + (x2 - x1) * i / 5 + (this.rng() - 0.5) * 14, y1 + (y2 - y1) * i / 5 + (this.rng() - 0.5) * 14);
     g.lineTo(x2, y2); g.strokePath();
     this.time.delayedCall(90, () => g.clear());
+  }
+
+  // ===================================================================================
+  //  Muerte del jefe
+  // ===================================================================================
+  /** Secuencia: cámara lenta, el jefe tiembla y parpadea, explosiones en cadena y estallido final. */
+  bossDeath(e) {
+    const x0 = e.x, y0 = e.y, col = e.color, cam = this.cameras.main;
+    this.bulletPool.forEach(b => { if (b.owner === 'enemy') { this.spark(b.x, b.y, 0xffffff, 1.2); this.releaseBullet(b); } });
+    Bus.emit('boss:dead', { name: e.bossName });
+    this.slowmo = 0.3;
+    this.tweens.addCounter({ from: 0.3, to: 1, duration: 2200, ease: 'Quad.easeIn', onUpdate: tw => { this.slowmo = tw.getValue(); }, onComplete: () => { this.slowmo = 1; } });
+    cam.shake(2200, 0.005);
+    this.sfx('boom');
+    this.time.addEvent({ delay: 40, repeat: 52, callback: () => {                       // temblor y parpadeo
+      if (!e.active) return;
+      e.setPosition(x0 + (this.rng() - 0.5) * 9, y0 + (this.rng() - 0.5) * 9);
+      e.setTint(this.rng() < 0.5 ? 0xffffff : col);
+    } });
+    for (let i = 0; i < 16; i++) {                                                       // explosiones en cadena sobre el cuerpo
+      this.time.delayedCall(i * 135, () => {
+        if (!e.active) return;
+        const a = this.rng() * 6.283, r = this.rng() * 40, ex = x0 + Math.cos(a) * r, ey = y0 + Math.sin(a) * r;
+        this.ringFx(ex, ey, 30 + this.rng() * 34, this.rng() < 0.5 ? col : 0xffe94d);
+        this.spawnBurst(ex, ey, this.rng() < 0.5 ? 0xff9a3c : col, 9);
+        this.sfx('boom');
+        if (i % 3 === 0) cam.flash(90, 255, 200, 120);
+      });
+    }
+    this.time.delayedCall(2200, () => {                                                  // gran estallido final
+      if (!e.active) return;
+      cam.flash(520, 255, 255, 255); cam.shake(800, 0.022);
+      [60, 100, 150, 200].forEach((r, k) => this.time.delayedCall(k * 90, () => this.ringFx(x0, y0, r, k % 2 ? 0xffe94d : col)));
+      this.spawnBurst(x0, y0, col, 40); this.spawnBurst(x0, y0, 0xffe94d, 40); this.spawnBurst(x0, y0, 0xffffff, 24);
+      this.sfx('boom'); this.sfx('kill');
+      this.tweens.add({ targets: [e, e.glowImg], scaleX: e.scaleX * 1.7, scaleY: e.scaleY * 1.7, alpha: 0, duration: 380, ease: 'Cubic.easeOut',
+        onComplete: () => { if (e.active) e.destroy(); Bus.emit('enemy:killed', { enemy: e }); } });
+    });
+  }
+
+  // ===================================================================================
+  //  Generador de portal, portal y viaje entre pisos
+  // ===================================================================================
+  /** El jefe suelta un generador de portal: cae desde arriba con una columna de luz. */
+  dropGenerator(x, y) {
+    const gen = this.addItem('generator', x, y, {});
+    gen.setAlpha(0).baseY = y - 170;
+    this.tweens.add({ targets: gen, baseY: y, alpha: 1, duration: 700, ease: 'Bounce.easeOut', delay: 250 });
+    const beam = this.add.rectangle(x, y - 100, 26, 220, 0x00f0ff, 0.5).setBlendMode(Phaser.BlendModes.ADD).setDepth(7);
+    this.tweens.add({ targets: beam, alpha: 0, scaleX: 0.2, duration: 950, onComplete: () => beam.destroy() });
+    this.time.delayedCall(950, () => { this.ringFx(x, y, 60, 0x00f0ff); this.spawnBurst(x, y, 0x00f0ff, 18); this.cameras.main.shake(160, 0.006); this.sfx('boom'); });
+    this.floatText(x, y - 56, 'Pulsa T para activar el portal', 0x00f0ff);
+  }
+
+  /** T cerca del generador: se carga, lanza un rayo y abre el portal. */
+  activateGenerator(it) {
+    it.activated = true;
+    const x = it.x, y = it.baseY;
+    this.sfx('module'); this.cameras.main.shake(700, 0.004);
+    if (it.label) it.label.setVisible(false);
+    this.tweens.add({ targets: it, scale: it.scaleX * 1.12, duration: 90, yoyo: true, repeat: 6 });            // vibra al cargar
+    for (let i = 0; i < 3; i++) {                                                                                // anillos que se contraen
+      const ring = this.add.circle(x, y, 110, 0x00f0ff, 0).setStrokeStyle(3, i % 2 ? 0xff2bd6 : 0x00f0ff, 1).setDepth(26).setBlendMode(Phaser.BlendModes.ADD);
+      this.tweens.add({ targets: ring, radius: 8, alpha: 0.2, duration: 650, delay: i * 180, ease: 'Cubic.easeIn', onComplete: () => ring.destroy() });
+    }
+    const beam = this.add.rectangle(x, y - 150, 18, 300, 0xffffff, 0.8).setBlendMode(Phaser.BlendModes.ADD).setDepth(27).setScale(1, 0).setOrigin(0.5, 1);
+    beam.y = y;
+    this.time.delayedCall(700, () => {
+      this.tweens.add({ targets: beam, scaleY: 1, scaleX: 2.4, alpha: 0, duration: 420, onComplete: () => beam.destroy() });
+      this.cameras.main.flash(260, 150, 240, 255);
+      it.remove();
+      const portal = this.addItem('portal', x, y, {});                                                           // el portal se abre
+      portal.setScale(0).setAlpha(0.2); portal.lock = this.time.now + 1800;                 // margen para no entrar sin querer
+      this.tweens.add({ targets: portal, scale: 1.05 * Art.scaleOf('portal_swirl'), alpha: 1, duration: 650, ease: 'Back.easeOut' });
+      this.ringFx(x, y, 120, 0x00f0ff); this.ringFx(x, y, 80, 0xff2bd6);
+      this.spawnBurst(x, y, 0x00f0ff, 30); this.sfx('boom');
+      this.floatText(x, y - 62, '¡Portal abierto!', 0x00f0ff);
+    });
+  }
+
+  /** Si queda un cofre sin abrir se abre primero; si no, empieza el viaje. */
+  tryEnterPortal(it) {
+    const chest = this.items.find(o => o.kind === 'chest' && !o.collected);
+    if (chest) {
+      it.lock = this.time.now + 2500;
+      const p = this.player, a = Math.atan2(p.y - it.baseY, p.x - it.x);
+      p.knock(a, 260);
+      this.floatText(it.x, it.y - 56, '¡Abre antes el cofre!', 0xffd23c);
+      this.collect(chest);
+      return;
+    }
+    this.enterPortal(it);
+  }
+
+  /** Viaje: el jugador gira y se encoge hacia el portal, la cámara se acerca y se funde a negro. */
+  enterPortal(it) {
+    this.travelling = true;
+    const p = this.player, cam = this.cameras.main, dur = 720;
+    this.sfx('open'); this.sfx('module');
+    this.floatText(it.x, it.y - 50, '', 0xffffff);
+    this.tweens.add({ targets: p, x: it.x, y: it.baseY, duration: 380, ease: 'Cubic.easeIn' });
+    this.tweens.add({ targets: p, rotation: p.rotation + Math.PI * 5, duration: dur, ease: 'Cubic.easeIn' });
+    this.tweens.add({ targets: [p, p.wpImg, p.glowImg], scaleX: 0, scaleY: 0, alpha: 0, duration: dur, ease: 'Cubic.easeIn' });
+    this.tweens.add({ targets: it, scale: it.scaleX * 1.35, duration: dur, ease: 'Sine.easeIn' });
+    cam.pan(it.x, it.baseY, dur, 'Cubic.easeInOut'); cam.zoomTo(1.7, dur, 'Cubic.easeIn');
+    this.ringFx(it.x, it.baseY, 90, 0x00f0ff); this.spawnBurst(it.x, it.baseY, 0xff2bd6, 22);
+    this.time.delayedCall(dur - 180, () => cam.fadeOut(260, 0, 0, 0));
+    this.time.delayedCall(dur + 120, () => {
+      cam.setZoom(1); cam.setScroll(0, 0);
+      p.setScale(Art.scaleOf(p.texture.key)).setAlpha(1).setRotation(0);
+      p.wpImg.setScale(1).setAlpha(1); p.glowImg.setScale(1.7).setAlpha(0.45);
+      this.travelling = false;
+      this.nextFloor();
+      cam.fadeIn(650, 0, 0, 0);
+    });
   }
 
   // ===================================================================================
@@ -846,7 +970,8 @@ class GameScene extends Phaser.Scene {
     if (this.runOver) return;
     if (Phaser.Input.Keyboard.JustDown(this.keyEsc) || this.touch.pause) { this.touch.pause = false; this.paused = !this.paused; Bus.emit('game:pause', { paused: this.paused }); }
     if (this.paused || this.choosing || this.chestOpen) return;
-    const dt = Math.min(0.05, delta / 1000);
+    const dt = Math.min(0.05, delta / 1000) * this.slowmo;
+    if (this.travelling) { this.updateParticles(dt); this.drawOver(); return; }
 
     this.player.update(dt);
     for (const e of this.enemies.slice()) if (!e.dead) e.update(dt);

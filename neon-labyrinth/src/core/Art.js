@@ -59,6 +59,7 @@ const Art = {
     this.skins(scene);
     this.items(scene);
     this.smith(scene);
+    this.portal(scene);
   },
 
   spike(c, cx, cy, ang, r0, r1, w, base, tip) {

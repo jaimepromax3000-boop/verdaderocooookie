@@ -105,21 +105,34 @@ class Player extends Entity {
     return spec;
   }
 
+  /** El arma se lleva en la mano derecha (al costado del cuerpo). Devuelve su posición, la boca del cañón y el ángulo real de tiro. */
+  muzzle() {
+    const ca = Math.cos(this.aimAngle), sa = Math.sin(this.aimAngle), rx = -sa, ry = ca;         // rx,ry: lado derecho
+    const cx = this.x + ca * 8 + rx * 14, cy = this.y + sa * 8 + ry * 14;                          // centro del arma
+    const mx = this.x + ca * 22 + rx * 14, my = this.y + sa * 22 + ry * 14;                        // boca del cañón
+    let D = 320;                                                                                     // joystick: converge a 320 px
+    if (!Settings.mobile) { const p = this.gs.input.activePointer; D = Math.max(90, Math.hypot(p.worldX - this.x, p.worldY - this.y)); }
+    const base = Math.atan2(this.y + sa * D - my, this.x + ca * D - mx);                           // apunta al cursor aunque la boca esté al lado
+    return { cx, cy, mx, my, base };
+  }
+
   shoot() {
     const spec = this.shotSpec();
     const w = this.weapon;
+    const m = this.muzzle();
     const lines = spec.multi || 1;                           // doble / triple disparo (mejora "Cadencia de fuego")
     for (let l = 0; l < lines; l++) {
       const off = (l - (lines - 1) / 2) * 9;                 // líneas paralelas separadas lateralmente
       for (let i = 0; i < w.pellets; i++) {
-        let a = this.aimAngle;
+        let a = m.base;
         if (w.pellets > 1) a += (i / (w.pellets - 1) - 0.5) * w.spread + (this.gs.rng() - 0.5) * 0.08;
         else a += (this.gs.rng() - 0.5) * w.spread;
-        const px = this.x + Math.cos(this.aimAngle) * 16 - Math.sin(this.aimAngle) * off, py = this.y + Math.sin(this.aimAngle) * 16 + Math.cos(this.aimAngle) * off;
+        const px = m.mx - Math.sin(m.base) * off, py = m.my + Math.cos(m.base) * off;
         this.gs.fireBullet(Object.assign({}, spec, { tags: spec.tags.slice() }), px, py, a);
       }
     }
-    this.gs.spawnBurst(this.x + Math.cos(this.aimAngle) * 20, this.y + Math.sin(this.aimAngle) * 20, this.character.color, 2);
+    this.recoil = 1;                                          // retroceso visual del arma
+    this.gs.spawnBurst(m.mx, m.my, this.character.color, 2);
     this.fireT = 1 / (w.rate * spec.rateMult);
     this.gs.sfx('shoot');
   }
@@ -242,7 +255,10 @@ class Player extends Entity {
     }
     this.updateOrbiters(dt);
     this.glowImg.setPosition(this.x, this.y).setAlpha(0.35 + 0.1 * Math.sin(this.gs.time.now / 180));
-    this.wpImg.setPosition(this.x + Math.cos(this.aimAngle) * 15, this.y + Math.sin(this.aimAngle) * 15).setRotation(this.aimAngle + Math.PI / 2);
+    const mz = this.muzzle();
+    this.recoil = Math.max(0, (this.recoil || 0) - dt * 9);
+    const rc = (this.recoil || 0) * 3;                    // pequeño retroceso al disparar
+    this.wpImg.setPosition(mz.cx - Math.cos(mz.base) * rc, mz.cy - Math.sin(mz.base) * rc).setRotation(mz.base + Math.PI / 2);
     if ((dir.x || dir.y) && this.dashT <= 0) {           // chispas del motor
       this.engineT -= dt;
       if (this.engineT <= 0) { this.engineT = 0.045; this.gs.spark(this.x - Math.cos(this.aimAngle) * 10 + (Math.random() - 0.5) * 4, this.y - Math.sin(this.aimAngle) * 10 + (Math.random() - 0.5) * 4, this.character.color, 0.7); }

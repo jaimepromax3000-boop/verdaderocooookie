@@ -327,4 +327,104 @@ Object.assign(Art, {
       c.strokeStyle = A.css(0x00f0ff, 0.85); c.lineWidth = 1.2; c.shadowColor = A.css(0x00f0ff, 1); c.shadowBlur = 5; c.beginPath(); c.moveTo(18, 16); c.lineTo(94, 16); c.stroke(); c.shadowBlur = 0;
     }, true);
   },
+
+  // ---------------------------------------------------------------- generador de portal y portal
+  portal(scene) {
+    const A = this, T = this.T;
+    A.make(scene, 'portal_gen', 56, 56, c => {
+      A.glow(c, 28, 30, 28, 0x00f0ff, 0.3);
+      c.fillStyle = A.css(0x000000, 0.35); c.beginPath(); c.ellipse(28, 50, 22, 5, 0, 0, T); c.fill();
+      A.poly(c, A.ngon(28, 38, 21, 6, Math.PI / 6)); A.plate(c, 0x3a4252, 0x00f0ff, 0, 20, 0, 56, 2);
+      A.poly(c, A.ngon(28, 38, 14, 6, Math.PI / 6)); A.plate(c, 0x1c2230, 0x7fe9ff, 0, 26, 0, 50, 1.5);
+      for (const sx of [-1, 1]) { A.rr(c, 28 + sx * 16 - 3, 12, 6, 28, 2); A.plate(c, 0x6a7488, 0xdfe6f2, 0, 12, 0, 40, 1); A.glow(c, 28 + sx * 16, 12, 5, 0x00f0ff, 0.9); }
+      A.poly(c, [[28, 6], [37, 24], [28, 42], [19, 24]]); A.plate(c, 0x1a7a9a, 0x9ff6ff, 19, 6, 37, 42, 2);
+      c.strokeStyle = A.css(0xffffff, 0.7); c.lineWidth = 0.8; c.beginPath(); c.moveTo(28, 6); c.lineTo(28, 42); c.moveTo(19, 24); c.lineTo(37, 24); c.stroke();
+      A.glow(c, 28, 24, 13, 0x00f0ff, 0.85); A.sparkle(c, 33, 15, 3.2);
+    });
+    A.make(scene, 'portal_swirl', 96, 96, c => {
+      const C = 48;
+      A.glow(c, C, C, 48, 0x00f0ff, 0.35);
+      c.fillStyle = A.rg(c, C, C, 2, C, C, 40, [[0, 0x02040e], [0.55, 0x0a1a4a], [0.85, 0x1a4aa8], [1, 0x00f0ff, 0.9]]);
+      c.beginPath(); c.arc(C, C, 40, 0, T); c.fill();
+      for (let arm = 0; arm < 5; arm++) {                               // brazos de la espiral
+        c.beginPath();
+        for (let r = 4; r <= 39; r += 1.5) { const a = arm * T / 5 + r * 0.13; const x = C + r * Math.cos(a), y = C + r * Math.sin(a); if (r === 4) c.moveTo(x, y); else c.lineTo(x, y); }
+        c.strokeStyle = A.lg(c, C - 40, C, C + 40, C, [[0, 0x00f0ff, 0.95], [1, 0xff2bd6, 0.85]]); c.lineWidth = 3.2; c.lineCap = 'round'; c.stroke();
+        c.strokeStyle = A.css(0xffffff, 0.55); c.lineWidth = 1; c.stroke();
+      }
+      c.strokeStyle = A.css(0x9ff6ff, 1); c.lineWidth = 3; c.beginPath(); c.arc(C, C, 40, 0, T); c.stroke();
+      c.strokeStyle = A.css(0xff2bd6, 0.8); c.lineWidth = 1.5; c.beginPath(); c.arc(C, C, 45, 0.3, 2.2); c.stroke(); c.beginPath(); c.arc(C, C, 45, 3.4, 5.3); c.stroke();
+      A.glow(c, C, C, 14, 0xffffff, 0.9);
+    });
+  },
+
+  // ---------------------------------------------------------------- cartas de mejora: fondo e iconos
+  ICON_OF: {
+    bounce: 'bounce', fire: 'flame', pierce: 'pierce', homing: 'target', overclock: 'bullet', explosive: 'blast', chain: 'bolt', split: 'split',
+    cryo: 'snow', toxin: 'skull', vampire: 'heart', shield: 'shield', surge: 'bolt', echo: 'boot', orbit: 'orbit', mine: 'mine', crit: 'crit',
+    magnet: 'magnet', nova: 'blast', orbshield: 'shield', rapid: 'bullet', forcefield: 'field', power: 'blast', nano: 'heart', maxhp: 'heart',
+    servo: 'boot', dodge: 'ghost', thorns: 'mine', timefield: 'snow', dashcd: 'boot', abilitycd: 'gear',
+  },
+
+  /** Fondo de cristal de una carta, teñido con el color de la mejora. */
+  cardBg(scene, col) {
+    const key = 'cardbg_' + col.toString(16), A = this, T = this.T, W = 262, H = 340;
+    A.make(scene, key, W, H, c => {
+      c.save();
+      c.shadowColor = A.css(col, 0.9); c.shadowBlur = 14;
+      A.rr(c, 8, 8, W - 16, H - 16, 14); c.fillStyle = A.lg(c, 0, 8, 0, H - 8, [[0, A.mix(0x0a1230, col, 0.22)], [0.35, 0x0b1432], [1, 0x060a18]]); c.fill();
+      c.restore();
+      c.save(); A.rr(c, 8, 8, W - 16, H - 16, 14); c.clip();
+      c.fillStyle = A.rg(c, W / 2, 80, 4, W / 2, 80, 150, [[0, col, 0.34], [1, col, 0]]); c.fillRect(0, 0, W, 240);          // resplandor del icono
+      c.strokeStyle = A.css(col, 0.06); c.lineWidth = 1; for (let i = -H; i < W; i += 14) { c.beginPath(); c.moveTo(i, H); c.lineTo(i + H, 0); c.stroke(); }
+      c.strokeStyle = A.css(col, 0.5); c.lineWidth = 1; c.beginPath(); c.moveTo(24, 212); c.lineTo(W - 24, 212); c.stroke();    // separador
+      c.fillStyle = A.css(col, 0.9); c.fillRect(W / 2 - 18, 210, 36, 4);
+      c.fillStyle = A.lg(c, 0, H - 60, 0, H, [[0, col, 0], [1, col, 0.22]]); c.fillRect(0, H - 60, W, 60);
+      c.restore();
+      A.rr(c, 8, 8, W - 16, H - 16, 14); c.strokeStyle = A.css(col, 1); c.lineWidth = 3; c.stroke();
+      A.rr(c, 13, 13, W - 26, H - 26, 10); c.strokeStyle = A.css(A.lt(col, 0.6), 0.35); c.lineWidth = 1; c.stroke();
+      c.strokeStyle = A.css(A.lt(col, 0.5), 1); c.lineWidth = 2.5;                                                              // esquinas
+      for (const [x, y, sx, sy] of [[18, 18, 1, 1], [W - 18, 18, -1, 1], [18, H - 18, 1, -1], [W - 18, H - 18, -1, -1]]) { c.beginPath(); c.moveTo(x, y + sy * 16); c.lineTo(x, y); c.lineTo(x + sx * 16, y); c.stroke(); }
+    });
+    return key;
+  },
+
+  /** Icono de una mejora: hexágono luminoso con un símbolo propio. */
+  icon(scene, id, col) {
+    const kind = this.ICON_OF[id] || 'gear', key = `ico_${kind}_${col.toString(16)}`, A = this, T = this.T;
+    A.make(scene, key, 76, 76, c => {
+      const X = 38, Y = 38, lite = A.lt(col, 0.65);
+      A.glow(c, X, Y, 38, col, 0.5);
+      A.poly(c, A.ngon(X, Y, 33, 6, Math.PI / 6)); c.fillStyle = A.rg(c, X - 6, Y - 8, 2, X, Y, 34, [[0, A.mix(0x10183a, col, 0.35)], [1, 0x070b1c]]); c.fill();
+      c.lineWidth = 3; c.strokeStyle = A.css(col, 1); c.shadowColor = A.css(col, 1); c.shadowBlur = 8; c.stroke(); c.shadowBlur = 0;
+      c.strokeStyle = A.css(lite, 0.4); c.lineWidth = 1; A.poly(c, A.ngon(X, Y, 28, 6, Math.PI / 6)); c.stroke();
+      c.fillStyle = A.lg(c, X, 14, X, 62, [[0, 0xffffff], [1, lite]]); c.strokeStyle = A.lg(c, X, 14, X, 62, [[0, 0xffffff], [1, lite]]); c.lineWidth = 3.2; c.lineCap = 'round'; c.lineJoin = 'round';
+      c.shadowColor = A.css(col, 1); c.shadowBlur = 6;
+      const P = (pts, fill) => { A.poly(c, pts); fill ? c.fill() : c.stroke(); };
+      switch (kind) {
+        case 'bullet': for (const dx of [-11, 0, 11]) { c.save(); c.translate(X + dx, Y); c.rotate(-0.5); A.rr(c, -3.2, -13, 6.4, 22, 3.2); c.fill(); c.restore(); } break;
+        case 'bounce': c.beginPath(); c.moveTo(14, 54); c.lineTo(30, 22); c.lineTo(44, 50); c.lineTo(60, 20); c.stroke(); P([[60, 14], [66, 26], [53, 25]], true); break;
+        case 'flame': c.beginPath(); c.moveTo(38, 12); c.bezierCurveTo(52, 26, 58, 38, 50, 52); c.bezierCurveTo(46, 60, 30, 60, 26, 52); c.bezierCurveTo(20, 42, 28, 34, 32, 26); c.bezierCurveTo(34, 32, 38, 30, 38, 12); c.fill(); break;
+        case 'pierce': c.beginPath(); c.moveTo(12, 38); c.lineTo(58, 38); c.stroke(); P([[66, 38], [52, 28], [52, 48]], true); c.lineWidth = 2.4; c.strokeRect(32, 22, 8, 32); break;
+        case 'target': c.beginPath(); c.arc(X, Y, 18, 0, T); c.stroke(); c.beginPath(); c.arc(X, Y, 6, 0, T); c.fill(); c.beginPath(); for (const [a, b, d, e] of [[X, 10, X, 22], [X, 54, X, 66], [10, Y, 22, Y], [54, Y, 66, Y]]) { c.moveTo(a, b); c.lineTo(d, e); } c.stroke(); break;
+        case 'bolt': P([[44, 10], [24, 40], [36, 40], [30, 66], [54, 32], [41, 32]], true); break;
+        case 'blast': { const pts = []; for (let i = 0; i < 16; i++) { const r = i % 2 ? 11 : 26; pts.push([X + r * Math.cos(i * T / 16), Y + r * Math.sin(i * T / 16)]); } P(pts, true); break; }
+        case 'split': c.beginPath(); c.moveTo(14, 56); c.lineTo(38, 38); c.moveTo(38, 38); c.lineTo(60, 16); c.moveTo(38, 38); c.lineTo(64, 36); c.moveTo(38, 38); c.lineTo(52, 62); c.stroke(); for (const [x, y] of [[60, 16], [64, 36], [52, 62], [14, 56]]) { c.beginPath(); c.arc(x, y, 4, 0, T); c.fill(); } break;
+        case 'snow': c.lineWidth = 2.6; for (let i = 0; i < 6; i++) { const a = i * T / 6; c.beginPath(); c.moveTo(X, Y); c.lineTo(X + 24 * Math.cos(a), Y + 24 * Math.sin(a)); c.moveTo(X + 15 * Math.cos(a), Y + 15 * Math.sin(a)); c.lineTo(X + 21 * Math.cos(a + 0.5), Y + 21 * Math.sin(a + 0.5)); c.moveTo(X + 15 * Math.cos(a), Y + 15 * Math.sin(a)); c.lineTo(X + 21 * Math.cos(a - 0.5), Y + 21 * Math.sin(a - 0.5)); c.stroke(); } break;
+        case 'skull': c.beginPath(); c.arc(X, 32, 17, 0, T); c.fill(); A.rr(c, X - 10, 42, 20, 14, 3); c.fill(); c.shadowBlur = 0; c.fillStyle = A.css(0x070b1c, 1); c.beginPath(); c.arc(X - 7, 32, 4.5, 0, T); c.arc(X + 7, 32, 4.5, 0, T); c.fill(); c.fillRect(X - 6, 48, 2.4, 8); c.fillRect(X - 1.2, 48, 2.4, 8); c.fillRect(X + 3.6, 48, 2.4, 8); break;
+        case 'heart': c.beginPath(); c.moveTo(X, 58); c.bezierCurveTo(8, 38, 14, 14, 30, 18); c.bezierCurveTo(35, 19, 38, 24, X, 28); c.bezierCurveTo(41, 24, 44, 19, 46, 18); c.bezierCurveTo(62, 14, 68, 38, X, 58); c.fill(); break;
+        case 'shield': c.beginPath(); c.moveTo(X, 10); c.lineTo(60, 18); c.lineTo(58, 42); c.quadraticCurveTo(54, 56, X, 66); c.quadraticCurveTo(22, 56, 18, 42); c.lineTo(16, 18); c.closePath(); c.fill(); c.shadowBlur = 0; c.strokeStyle = A.css(0x070b1c, 0.55); c.lineWidth = 2; c.beginPath(); c.moveTo(X, 16); c.lineTo(X, 58); c.moveTo(22, 30); c.lineTo(54, 30); c.stroke(); break;
+        case 'orbit': c.beginPath(); c.arc(X, Y, 7, 0, T); c.fill(); c.lineWidth = 2; c.beginPath(); c.ellipse(X, Y, 24, 11, -0.5, 0, T); c.stroke(); for (const a of [0.4, 2.6, 4.4]) { c.beginPath(); c.arc(X + 24 * Math.cos(a) * 0.9, Y + 15 * Math.sin(a), 4.2, 0, T); c.fill(); } break;
+        case 'mine': c.beginPath(); c.arc(X, Y, 13, 0, T); c.fill(); for (let i = 0; i < 8; i++) { const a = i * T / 8; c.beginPath(); c.moveTo(X + 13 * Math.cos(a), Y + 13 * Math.sin(a)); c.lineTo(X + 25 * Math.cos(a), Y + 25 * Math.sin(a)); c.stroke(); } break;
+        case 'crit': { const pts = []; for (let i = 0; i < 8; i++) { const r = i % 2 ? 7 : 27; pts.push([X + r * Math.cos(i * T / 8 - Math.PI / 2), Y + r * Math.sin(i * T / 8 - Math.PI / 2)]); } P(pts, true); break; }
+        case 'magnet': c.lineWidth = 9; c.beginPath(); c.moveTo(22, 16); c.lineTo(22, 38); c.arc(X, 38, 16, Math.PI, 0, true); c.lineTo(54, 16); c.stroke(); c.shadowBlur = 0; c.fillStyle = A.css(0xffffff, 0.95); c.fillRect(17.5, 12, 9, 9); c.fillRect(49.5, 12, 9, 9); break;
+        case 'boot': for (const dx of [-9, 7]) { c.beginPath(); c.moveTo(X + dx - 8, 20); c.lineTo(X + dx + 8, 38); c.lineTo(X + dx - 8, 56); c.stroke(); } break;
+        case 'field': for (const r of [8, 17, 26]) { c.lineWidth = r === 8 ? 5 : 2.4; c.beginPath(); c.arc(X, Y, r, 0, T); c.stroke(); } break;
+        case 'ghost': c.setLineDash([5, 5]); c.beginPath(); c.arc(X, Y, 24, 0, T); c.stroke(); c.setLineDash([]); c.beginPath(); c.arc(X, Y, 8, 0, T); c.fill(); break;
+        default: { const pts = []; for (let i = 0; i < 16; i++) { const r = i % 2 ? 15 : 24; pts.push([X + r * Math.cos(i * T / 16), Y + r * Math.sin(i * T / 16)]); } P(pts, true); c.shadowBlur = 0; c.fillStyle = A.css(0x070b1c, 1); c.beginPath(); c.arc(X, Y, 7, 0, T); c.fill(); }
+      }
+      c.shadowBlur = 0;
+    });
+    return key;
+  },
 });

@@ -16,7 +16,8 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 | Dash con invulnerabilidad | Espacio / Shift |
 | Habilidad activa del personaje | Q / clic derecho |
 | Mapa grande de la planta | mantén Tab |
-| Recoger, comprar, usar portal | E |
+| Recoger y comprar | E |
+| Activar el generador de portal | T (botón T en móvil) |
 | Pausa | ESC |
 
 ## Menú principal
@@ -32,6 +33,7 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 - Sala inicial segura: eliges arma inicial (Pulso, Dispersor, Lanza Riel).
 - **25 plantas** (de 10-15 salas la primera a 30-35 la última) con 12 biomas y 6 jefes distintos que reaparecen en versiones Mk II a Mk V (la planta 25 es el jefe final); las puertas se sellan al entrar y se abren al matar a todos los enemigos (algunas salas tienen 2 oleadas).
 - **Al limpiar una sala eliges 1 de 3 mejoras temporales** aleatorias y distintas. Duran una partida y tienen niveles: escudos orbitales, cadencia de fuego (más disparos por segundo, luego doble y triple disparo), campo de fuerza, daño, nanobots, velocidad, esquiva, espinas, campo temporal... 31 en total.
+- **Al morir, el jefe estalla en una secuencia animada (cámara lenta, explosiones en cadena)** y suelta un **generador de portal**: acércate y pulsa **T** (en móvil, el botón T) para abrir el portal y atraviésalo para bajar de piso. Si queda un cofre sin abrir, se abre primero.
 - **El jefe suelta un cofre** (Bronce / Plata / Oro según la planta y la dificultad) con monedas, fragmentos, mejoras permanentes o skins. Se abre con E.
 - Salas especiales: **Tienda** (mejoras temporales con créditos), **Tesoro** oculto (puerta con llave) y **Jefe** en el punto más lejano.
 - Trampas de pinchos con aviso, barriles explosivos, 12 diseños de obstáculos y enemigos variados con **élites**.
@@ -40,6 +42,7 @@ Si tu navegador no tiene WebGL: `index.html?canvas` fuerza el render por CPU.
 ## Controles
 
 PC: WASD/flechas, ratón, Espacio/Shift (dash), Q o clic derecho (habilidad), E (interactuar), Tab (mapa), ESC (pausa).
+El arma se lleva en la mano derecha (al costado) y la bala sale de su boca apuntando al cursor.
 Móvil/tablet: joystick izquierdo mover, joystick derecho apuntar y disparar, botones en pantalla.
 
 ## Estructura
