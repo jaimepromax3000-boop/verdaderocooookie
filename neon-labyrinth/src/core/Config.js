@@ -119,7 +119,7 @@ const Meta = {
   },
 
   /** Nombre del jugador marcado para que el traductor no lo toque. */
-  shown() { return '\u2060' + this.data.name; },
+  shown() { return I18n.playerName(this.data.name); },
 
   hasSkin(id) { return this.data.skins.includes(id); },
 

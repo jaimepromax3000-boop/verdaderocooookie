@@ -121,11 +121,17 @@ const I18n = {
     'COFRE DE BRONCE': ['BRONZE CHEST', 'COFFRE DE BRONZE'], 'COFRE DE PLATA': ['SILVER CHEST', 'COFFRE D\'ARGENT'], 'COFRE DE ORO': ['GOLD CHEST', 'COFFRE D\'OR'],
     'Derrota a un jefe': ['Defeat a boss', 'Battez un boss'],
     'Armadura': ['Armor', 'Armure'], 'Tienda': ['Shop', 'Boutique'],
+    'Centinela': ['Sentinel', 'Sentinelle'], 'Invocador': ['Summoner', 'Invocateur'], 'Dron': ['Drone', 'Drone'], 'Francotirador': ['Sniper', 'Tireur d\'élite'], 'Blindado': ['Armored', 'Blindé'], 'Bomba lógica': ['Logic Bomb', 'Bombe logique'],
+    'Torreta': ['Turret', 'Tourelle'], 'Espectro': ['Specter', 'Spectre'], 'Fractal': ['Fractal', 'Fractal'], 'Fragmento': ['Fragment', 'Fragment'], 'Guardián': ['Guardian', 'Gardien'], 'Veloz': ['Swift', 'Rapide'], 'Volátil': ['Volatile', 'Volatil'],
+    'Cadencia alta, daño medio.': ['High fire rate, medium damage.', 'Cadence élevée, dégâts moyens.'], 'Ráfaga de 5 perdigones.': ['Burst of 5 pellets.', 'Rafale de 5 plombs.'], 'Lenta, atraviesa enemigos.': ['Slow, pierces enemies.', 'Lent, traverse les ennemis.'],
+    'DASH': ['DASH', 'ESQ.'], 'MAP': ['MAP', 'CARTE'], 'Bronce': ['Bronze', 'Bronze'], 'Plata': ['Silver', 'Argent'], 'Oro': ['Gold', 'Or'],
+    'Pulsa en el nombre y escribe (máx. 14 letras). Enter para guardar.': ['Click the name and type (max. 14 letters). Enter to save.', 'Cliquez sur le nom et tapez (14 lettres max.). Entrée pour valider.'],
     'Cofre de Bronce:': ['Bronze Chest:', 'Coffre de bronze :'], 'Cofre de Plata:': ['Silver Chest:', 'Coffre d\'argent :'], 'Cofre de Oro:': ['Gold Chest:', 'Coffre d\'or :'],
   },
 
   /** Reglas con números y partes variables. tg = grupos que se traducen por separado. */
   R: [
+    [/^(.+) M[kK] II$/, '$1 Mk II', '$1 Mk II', [1]],
     [/^Elimina (\d+) enemigos$/, 'Defeat $1 enemies', 'Éliminez $1 ennemis'], [/^Elimina (\d+) élites$/, 'Defeat $1 elites', 'Éliminez $1 élites'],
     [/^Elimina (\d+) (.+)$/, 'Defeat $1 $2', 'Éliminez $1 $2', [2]],
     [/^Limpia (\d+) salas$/, 'Clear $1 rooms', 'Nettoyez $1 salles'], [/^Derrota a (\d+) jefes$/, 'Defeat $1 bosses', 'Battez $1 boss'],
@@ -165,6 +171,7 @@ const I18n = {
   /** Activa el parche de Phaser (una vez) y limpia la caché al cambiar de idioma. */
   apply() {
     this.cache = { en: new Map(), fr: new Map() };
+    this.translatePage();
     if (this.installed || typeof Phaser === 'undefined') return;
     this.installed = true;
     const orig = Phaser.GameObjects.Text.prototype.setText;
@@ -175,6 +182,21 @@ const I18n = {
   },
 
   idx() { return this.lang === 'en' ? 0 : 1; },
+
+  /** Pie de la página web (fuera del juego): se guarda el original en español y se traduce. */
+  FOOT: {
+    en: '<kbd>WASD</kbd> · mouse · <kbd>Space</kbd> dash · <kbd>Q</kbd> ability · <kbd>E</kbd> interact · <kbd>Tab</kbd> map · gear ⚙ = language, volume and touch controls. Click the game and press <kbd>Enter</kbd> to start.',
+    fr: '<kbd>WASD</kbd> · souris · <kbd>Espace</kbd> esquive · <kbd>Q</kbd> capacité · <kbd>E</kbd> interagir · <kbd>Tab</kbd> carte · engrenage ⚙ = langue, volume et commandes tactiles. Cliquez sur le jeu et appuyez sur <kbd>Entrée</kbd> pour commencer.',
+  },
+  translatePage() {
+    if (typeof document === 'undefined') return;
+    const f = document.querySelector('footer');
+    if (f) { if (f.dataset.es === undefined) f.dataset.es = f.innerHTML; f.innerHTML = this.lang === 'es' ? f.dataset.es : this.FOOT[this.lang]; }
+    document.documentElement.lang = this.lang;
+  },
+
+  /** Nombre por defecto del jugador según el idioma (los nombres elegidos por el jugador no se traducen). */
+  playerName(name) { return name === 'Operador' ? this.tr('Operador') : '\u2060' + name; },
 
   /** Traduce un texto (varias líneas) al idioma activo. */
   tr(str) {

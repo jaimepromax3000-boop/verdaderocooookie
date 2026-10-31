@@ -190,7 +190,7 @@ class MenuScene extends Phaser.Scene {
   refreshName() {
     if (!this.nameText || !this.nameText.active) return;
     const caret = this.editing && Math.floor(this.time.now / 450) % 2 === 0 ? '|' : ' ';
-    this.nameText.setText('\u2060' + (this.editing ? this.nameDraft : Meta.data.name) + (this.editing ? caret : ''));
+    this.nameText.setText(this.editing ? '\u2060' + this.nameDraft + caret : Meta.shown());
   }
 
   update() { if (this.editing) this.refreshName(); }
